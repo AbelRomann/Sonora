@@ -22,6 +22,7 @@ import com.example.reproductor.presentation.library.LibraryViewModel
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
     onNavigateToLibrary: () -> Unit,
+    onNavigateToAlbum: (Long) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val songs by viewModel.songs.collectAsState()
@@ -85,7 +86,7 @@ fun HomeScreen(
                                 AlbumCard(
                                     album = album,
                                     onClick = {
-                                        // TODO: Navegar a vista de álbum
+                                        onNavigateToAlbum(album.id)
                                     }
                                 )
                             }

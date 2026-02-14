@@ -16,12 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
 import com.example.reproductor.presentation.navigation.Screen
 import com.example.reproductor.ui.theme.ReproductorTheme
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.navigation.compose.currentBackStackEntryAsState
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -74,28 +75,43 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-// ... (la clase MainActivity se queda como está) ...
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MusicPlayerApp() {
     val navController = rememberNavController()
-    // Observamos el estado de la pila de navegación para saber en qué ruta estamos
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    // La barra de navegación inferior solo se debe mostrar si NO estamos en la pantalla del reproductor
-    val showBottomBar = currentRoute != Screen.Player.route
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val showPlayer = currentRoute == Screen.Player.route
 
     Scaffold(
         bottomBar = {
-            if (showBottomBar) {
-                BottomNavigationBar(
-                    // Pasamos el navController para que los items puedan navegar
-                    navController = navController,
-                    // Pasamos la ruta actual para saber cuál item resaltar
-                    currentRoute = currentRoute
-                )
+            Column {
+                // Mini Player (se muestra en todas las pantallas excepto en el Player completo)
+                if (!showPlayer) {
+                    MiniPlayer(
+                        onExpand = {
+                            navController.navigate(Screen.Player.route)
+                        }
+                    )
+                }
+
+                // Bottom Navigation
+                if (!showPlayer) {
+                    BottomNavigationBar(
+                        currentRoute = currentRoute,
+                        onHomeClick = {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) { inclusive = true }
+                            }
+                        },
+                        onLibraryClick = {
+                            navController.navigate(Screen.Library.route)
+                        },
+                        onSearchClick = {
+                            navController.navigate(Screen.Search.route)
+                        }
+                    )
+                }
             }
         }
     ) { paddingValues ->
@@ -103,7 +119,6 @@ fun MusicPlayerApp() {
             NavGraph(
                 navController = navController,
                 onNavigateToPlayer = {
-                    // Simplemente navega a la pantalla del reproductor
                     navController.navigate(Screen.Player.route)
                 }
             )
@@ -113,28 +128,27 @@ fun MusicPlayerApp() {
 
 @Composable
 fun BottomNavigationBar(
-    navController: androidx.navigation.NavController, // Recibe el NavController
-    currentRoute: String? // Recibe la ruta actual
+    currentRoute: String?,
+    onHomeClick: () -> Unit,
+    onLibraryClick: () -> Unit,
+    onSearchClick: () -> Unit
 ) {
     NavigationBar {
         NavigationBarItem(
-            // El item está seleccionado si la ruta actual es "home"
             selected = currentRoute == Screen.Home.route,
-            onClick = { navController.navigate(Screen.Home.route) },
+            onClick = onHomeClick,
             icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
             label = { Text("Inicio") }
         )
         NavigationBarItem(
-            // El item está seleccionado si la ruta actual es "library"
             selected = currentRoute == Screen.Library.route,
-            onClick = { navController.navigate(Screen.Library.route) },
+            onClick = onLibraryClick,
             icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") },
             label = { Text("Biblioteca") }
         )
         NavigationBarItem(
-            // El item está seleccionado si la ruta actual es "search"
             selected = currentRoute == Screen.Search.route,
-            onClick = { navController.navigate(Screen.Search.route) },
+            onClick = onSearchClick,
             icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
             label = { Text("Buscar") }
         )
@@ -145,7 +159,6 @@ fun BottomNavigationBar(
 fun PermissionScreen(
     onRequestPermission: () -> Unit
 ) {
-    // ... (Esta función ya está bien, no necesita cambios) ...
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
