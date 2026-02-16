@@ -15,13 +15,12 @@ import com.example.reproductor.domain.repository.MusicRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.firstOrNull
 
 @Singleton
 class MusicRepositoryImpl @Inject constructor(
@@ -34,7 +33,7 @@ class MusicRepositoryImpl @Inject constructor(
 
     private val PREFS_NAME = "music_cache"
     private val KEY_LAST_SCAN = "last_scan_timestamp"
-    private val CACHE_VALIDITY_MS = 3600000L // 1 hora
+    private val CACHE_VALIDITY_MS = 3600000L
 
     override fun getAllSongs(): Flow<List<Song>> {
         return songDao.getAllSongs()
@@ -67,17 +66,14 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshMusic() = withContext(Dispatchers.IO) {
-        // Verificar si necesita actualizar basado en caché
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val lastScan = prefs.getLong(KEY_LAST_SCAN, 0)
         val now = System.currentTimeMillis()
 
-        // Verificar si la base de datos está vacía
         val hasSongs = songDao.getAllSongs()
             .map { it.isNotEmpty() }
             .firstOrNull() ?: false
 
-        // Solo escanear si ha pasado más de 1 hora o si no hay datos
         val shouldScan = (now - lastScan > CACHE_VALIDITY_MS) || !hasSongs
 
         if (shouldScan) {
@@ -90,7 +86,6 @@ class MusicRepositoryImpl @Inject constructor(
             songDao.insertSongs(songs)
             albumDao.insertAlbums(albums)
 
-            // Actualizar timestamp del último escaneo
             prefs.edit().putLong(KEY_LAST_SCAN, now).apply()
         }
     }
@@ -105,22 +100,27 @@ class MusicRepositoryImpl @Inject constructor(
         songDao.insertSongs(songs)
         albumDao.insertAlbums(albums)
 
-        // Actualizar timestamp
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_LAST_SCAN, System.currentTimeMillis()).apply()
     }
 
     override fun getAllPlaylists(): Flow<List<Playlist>> {
-        return playlistDao.getAllPlaylists().map { entities ->
-            entities.map { entity ->
+        return playlistDao.getAllPlaylists().map { rows ->
+            rows.map { row ->
                 Playlist(
-                    id = entity.id,
-                    name = entity.name,
-                    songCount = 0,
-                    createdAt = entity.createdAt
+                    id = row.playlist.id,
+                    name = row.playlist.name,
+                    songCount = row.songCount,
+                    createdAt = row.playlist.createdAt
                 )
             }
         }.flowOn(Dispatchers.IO)
+    }
+
+    override fun getSongsInPlaylist(playlistId: Long): Flow<List<Song>> {
+        return playlistDao.getSongsInPlaylist(playlistId)
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
     }
 
     override suspend fun createPlaylist(name: String): Long {
@@ -131,11 +131,12 @@ class MusicRepositoryImpl @Inject constructor(
 
     override suspend fun addSongToPlaylist(playlistId: Long, songId: Long) {
         withContext(Dispatchers.IO) {
+            val nextPosition = playlistDao.getMaxPosition(playlistId) + 1
             playlistDao.insertPlaylistSong(
                 PlaylistSongCrossRef(
                     playlistId = playlistId,
                     songId = songId,
-                    position = 0
+                    position = nextPosition
                 )
             )
         }
@@ -143,13 +144,8 @@ class MusicRepositoryImpl @Inject constructor(
 
     override suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
         withContext(Dispatchers.IO) {
-            playlistDao.deletePlaylistSong(
-                PlaylistSongCrossRef(
-                    playlistId = playlistId,
-                    songId = songId,
-                    position = 0
-                )
-            )
+            playlistDao.deleteSongFromPlaylist(playlistId, songId)
+            normalizePlaylistPositions(playlistId)
         }
     }
 
@@ -159,6 +155,29 @@ class MusicRepositoryImpl @Inject constructor(
             playlist?.let {
                 playlistDao.deletePlaylist(it)
             }
+        }
+    }
+
+    override suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int) {
+        withContext(Dispatchers.IO) {
+            val songIds = playlistDao.getSongIdsByPlaylist(playlistId).toMutableList()
+            if (fromIndex !in songIds.indices || toIndex !in songIds.indices || fromIndex == toIndex) {
+                return@withContext
+            }
+
+            val movedSongId = songIds.removeAt(fromIndex)
+            songIds.add(toIndex, movedSongId)
+
+            songIds.forEachIndexed { index, songId ->
+                playlistDao.updateSongPosition(playlistId, songId, index)
+            }
+        }
+    }
+
+    private suspend fun normalizePlaylistPositions(playlistId: Long) {
+        val songIds = playlistDao.getSongIdsByPlaylist(playlistId)
+        songIds.forEachIndexed { index, id ->
+            playlistDao.updateSongPosition(playlistId, id, index)
         }
     }
 }

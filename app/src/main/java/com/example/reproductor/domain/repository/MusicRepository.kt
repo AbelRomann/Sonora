@@ -12,12 +12,13 @@ interface MusicRepository {
     fun getSongsByArtist(artistId: Long): Flow<List<Song>>
     fun searchSongs(query: String): Flow<List<Song>>
     suspend fun refreshMusic()
-    suspend fun forceRefreshMusic() // Nueva función para forzar actualización
+    suspend fun forceRefreshMusic()
 
-    // Playlists
     fun getAllPlaylists(): Flow<List<Playlist>>
+    fun getSongsInPlaylist(playlistId: Long): Flow<List<Song>>
     suspend fun createPlaylist(name: String): Long
     suspend fun addSongToPlaylist(playlistId: Long, songId: Long)
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long)
     suspend fun deletePlaylist(playlistId: Long)
+    suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int)
 }
