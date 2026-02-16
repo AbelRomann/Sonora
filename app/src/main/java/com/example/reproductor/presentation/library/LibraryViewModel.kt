@@ -11,13 +11,17 @@ import com.example.reproductor.domain.usecase.GetAllSongsUseCase
 import com.example.reproductor.domain.usecase.RefreshMusicUseCase
 import com.example.reproductor.presentation.player.MusicPlayerController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,11 +33,28 @@ class LibraryViewModel @Inject constructor(
     private val playerController: MusicPlayerController
 ) : ViewModel() {
 
-    private val _songs = MutableStateFlow<List<Song>>(emptyList())
-    val songs: StateFlow<List<Song>> = _songs.asStateFlow()
+    private val refreshMutex = Mutex()
+    private var refreshJob: Job? = null
 
-    private val _albums = MutableStateFlow<List<Album>>(emptyList())
-    val albums: StateFlow<List<Album>> = _albums.asStateFlow()
+    val songs: StateFlow<List<Song>> = getAllSongsUseCase()
+        .catch { e ->
+            _error.value = "Error al cargar canciones: ${e.message}"
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val albums: StateFlow<List<Album>> = getAlbumsUseCase()
+        .onEach { albumList ->
+            if (_isLoading.value && albumList.isNotEmpty()) {
+                _isLoading.value = false
+            }
+        }
+        .catch { e ->
+            _error.value = "Error al cargar álbumes: ${e.message}"
+            _isLoading.value = false
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val playlists: StateFlow<List<Playlist>> = musicRepository.getAllPlaylists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -45,45 +66,10 @@ class LibraryViewModel @Inject constructor(
     val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
-        loadMusic()
+        refreshMusic()
     }
 
     fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
-
-    private fun loadMusic() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
-            try {
-                refreshMusicUseCase()
-
-                launch {
-                    getAllSongsUseCase()
-                        .catch { e ->
-                            _error.value = "Error al cargar canciones: ${e.message}"
-                        }
-                        .collect { songList ->
-                            _songs.value = songList
-                        }
-                }
-
-                launch {
-                    getAlbumsUseCase()
-                        .catch { e ->
-                            _error.value = "Error al cargar álbumes: ${e.message}"
-                        }
-                        .collect { albumList ->
-                            _albums.value = albumList
-                            _isLoading.value = false
-                        }
-                }
-            } catch (e: Exception) {
-                _error.value = "Error al escanear música: ${e.message}"
-                _isLoading.value = false
-            }
-        }
-    }
 
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
@@ -125,7 +111,20 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun refreshMusic() {
-        loadMusic()
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            refreshMutex.withLock {
+                _isLoading.value = true
+                _error.value = null
+                try {
+                    refreshMusicUseCase()
+                } catch (e: Exception) {
+                    _error.value = "Error al escanear música: ${e.message}"
+                } finally {
+                    _isLoading.value = false
+                }
+            }
+        }
     }
 
     fun clearError() {

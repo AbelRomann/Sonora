@@ -94,7 +94,6 @@ fun SongItem(
     }
 }
 
-@Composable
 fun formatDuration(millis: Long): String {
     val seconds = (millis / 1000) % 60
     val minutes = (millis / (1000 * 60)) % 60

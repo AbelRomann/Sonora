@@ -8,8 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -25,9 +26,16 @@ fun HomeScreen(
     onNavigateToAlbum: (Long) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
-    val songs by viewModel.songs.collectAsState()
-    val albums by viewModel.albums.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    val onSongClick = remember(viewModel, onNavigateToPlayer) {
+        { song: com.example.reproductor.domain.model.Song ->
+            viewModel.playSong(song)
+            onNavigateToPlayer()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -82,7 +90,11 @@ fun HomeScreen(
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(albums.take(10)) { album ->
+                            items(
+                                items = albums.take(10),
+                                key = { it.id },
+                                contentType = { "album" }
+                            ) { album ->
                                 AlbumCard(
                                     album = album,
                                     onClick = {
@@ -116,13 +128,14 @@ fun HomeScreen(
                     }
                 }
 
-                items(songs.take(20)) { song ->
+                items(
+                    items = songs.take(20),
+                    key = { it.id },
+                    contentType = { "song" }
+                ) { song ->
                     SongItem(
                         song = song,
-                        onClick = {
-                            viewModel.playSong(song)
-                            onNavigateToPlayer()
-                        }
+                        onClick = { onSongClick(song) }
                     )
                 }
 
