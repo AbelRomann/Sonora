@@ -96,6 +96,12 @@ dependencies {
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    // Accompanist para animaciones de navegación
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.34.0")
+
+    // Coil con mejor performance
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("io.coil-kt:coil-svg:2.5.0")
 
     // Testing
     testImplementation(libs.junit)

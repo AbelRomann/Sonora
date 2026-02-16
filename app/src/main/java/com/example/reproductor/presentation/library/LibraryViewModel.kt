@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,6 +33,9 @@ class LibraryViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     init {
         loadMusic()
     }
@@ -39,24 +43,36 @@ class LibraryViewModel @Inject constructor(
     private fun loadMusic() {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
 
-            // Escanear música del dispositivo
             try {
+                // Escanear música del dispositivo (usa caché automáticamente)
                 refreshMusicUseCase()
+
+                // Obtener canciones
+                launch {
+                    getAllSongsUseCase()
+                        .catch { e ->
+                            _error.value = "Error al cargar canciones: ${e.message}"
+                        }
+                        .collect { songList ->
+                            _songs.value = songList
+                        }
+                }
+
+                // Obtener álbumes
+                launch {
+                    getAlbumsUseCase()
+                        .catch { e ->
+                            _error.value = "Error al cargar álbumes: ${e.message}"
+                        }
+                        .collect { albumList ->
+                            _albums.value = albumList
+                            _isLoading.value = false
+                        }
+                }
             } catch (e: Exception) {
-                // Manejar error
-            }
-
-            // Obtener canciones
-            getAllSongsUseCase().collect { songList ->
-                _songs.value = songList
-            }
-        }
-
-        viewModelScope.launch {
-            // Obtener álbumes
-            getAlbumsUseCase().collect { albumList ->
-                _albums.value = albumList
+                _error.value = "Error al escanear música: ${e.message}"
                 _isLoading.value = false
             }
         }
@@ -72,5 +88,9 @@ class LibraryViewModel @Inject constructor(
 
     fun refreshMusic() {
         loadMusic()
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 }

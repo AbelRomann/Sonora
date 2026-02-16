@@ -1,7 +1,6 @@
 package com.example.reproductor.domain.repository
 
 import com.example.reproductor.domain.model.Album
-import com.example.reproductor.domain.model.Artist
 import com.example.reproductor.domain.model.Playlist
 import com.example.reproductor.domain.model.Song
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +12,7 @@ interface MusicRepository {
     fun getSongsByArtist(artistId: Long): Flow<List<Song>>
     fun searchSongs(query: String): Flow<List<Song>>
     suspend fun refreshMusic()
+    suspend fun forceRefreshMusic() // Nueva función para forzar actualización
 
     // Playlists
     fun getAllPlaylists(): Flow<List<Playlist>>
