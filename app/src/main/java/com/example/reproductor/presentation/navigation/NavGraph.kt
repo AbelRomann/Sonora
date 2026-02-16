@@ -1,6 +1,9 @@
 package com.example.reproductor.presentation.navigation
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
@@ -9,6 +12,7 @@ import androidx.navigation.navArgument
 import com.example.reproductor.presentation.screens.album.AlbumScreen
 import com.example.reproductor.presentation.screens.home.HomeScreen
 import com.example.reproductor.presentation.screens.library.LibraryScreen
+import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
 import com.google.accompanist.navigation.animation.AnimatedNavHost
@@ -21,6 +25,9 @@ sealed class Screen(val route: String) {
     object Search : Screen("search")
     object Album : Screen("album/{albumId}") {
         fun createRoute(albumId: Long) = "album/$albumId"
+    }
+    object PlaylistDetail : Screen("playlist/{playlistId}") {
+        fun createRoute(playlistId: Long) = "playlist/$playlistId"
     }
 }
 
@@ -74,6 +81,22 @@ fun NavGraph(
 
         composable(Screen.Library.route) {
             LibraryScreen(
+                onNavigateToPlayer = onNavigateToPlayer,
+                onBackClick = { navController.popBackStack() },
+                onOpenPlaylist = { playlistId ->
+                    navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PlaylistDetail.route,
+            arguments = listOf(
+                navArgument("playlistId") { type = NavType.LongType }
+            )
+        ) {
+            PlaylistDetailScreen(
+                playlistId = it.arguments?.getLong("playlistId") ?: 0L,
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
             )

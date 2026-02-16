@@ -3,16 +3,20 @@ package com.example.reproductor.presentation.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.reproductor.domain.model.Album
+import com.example.reproductor.domain.model.Playlist
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.domain.repository.MusicRepository
 import com.example.reproductor.domain.usecase.GetAlbumsUseCase
 import com.example.reproductor.domain.usecase.GetAllSongsUseCase
 import com.example.reproductor.domain.usecase.RefreshMusicUseCase
 import com.example.reproductor.presentation.player.MusicPlayerController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,6 +25,7 @@ class LibraryViewModel @Inject constructor(
     private val getAllSongsUseCase: GetAllSongsUseCase,
     private val getAlbumsUseCase: GetAlbumsUseCase,
     private val refreshMusicUseCase: RefreshMusicUseCase,
+    private val musicRepository: MusicRepository,
     private val playerController: MusicPlayerController
 ) : ViewModel() {
 
@@ -29,6 +34,9 @@ class LibraryViewModel @Inject constructor(
 
     private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> = _albums.asStateFlow()
+
+    val playlists: StateFlow<List<Playlist>> = musicRepository.getAllPlaylists()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -40,16 +48,16 @@ class LibraryViewModel @Inject constructor(
         loadMusic()
     }
 
+    fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
+
     private fun loadMusic() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
             try {
-                // Escanear música del dispositivo (usa caché automáticamente)
                 refreshMusicUseCase()
 
-                // Obtener canciones
                 launch {
                     getAllSongsUseCase()
                         .catch { e ->
@@ -60,7 +68,6 @@ class LibraryViewModel @Inject constructor(
                         }
                 }
 
-                // Obtener álbumes
                 launch {
                     getAlbumsUseCase()
                         .catch { e ->
@@ -75,6 +82,37 @@ class LibraryViewModel @Inject constructor(
                 _error.value = "Error al escanear música: ${e.message}"
                 _isLoading.value = false
             }
+        }
+    }
+
+    fun createPlaylist(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            musicRepository.createPlaylist(name.trim())
+        }
+    }
+
+    fun deletePlaylist(playlistId: Long) {
+        viewModelScope.launch {
+            musicRepository.deletePlaylist(playlistId)
+        }
+    }
+
+    fun addSongToPlaylist(playlistId: Long, songId: Long) {
+        viewModelScope.launch {
+            musicRepository.addSongToPlaylist(playlistId, songId)
+        }
+    }
+
+    fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
+        viewModelScope.launch {
+            musicRepository.removeSongFromPlaylist(playlistId, songId)
+        }
+    }
+
+    fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            musicRepository.moveSongInPlaylist(playlistId, fromIndex, toIndex)
         }
     }
 
