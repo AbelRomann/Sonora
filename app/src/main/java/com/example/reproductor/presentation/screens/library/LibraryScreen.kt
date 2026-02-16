@@ -35,7 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -54,8 +54,8 @@ fun LibraryScreen(
     onOpenPlaylist: (Long) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
-    val songs by viewModel.songs.collectAsState()
-    val playlists by viewModel.playlists.collectAsState()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -177,7 +177,11 @@ private fun SongsTab(
             }
         }
 
-        items(songs) { song ->
+        items(
+            items = songs,
+            key = { it.id },
+            contentType = { "song" }
+        ) { song ->
             SongItem(song = song, onClick = { onSongClick(song) })
         }
 
@@ -223,7 +227,11 @@ private fun PlaylistsTab(
                 }
             }
         } else {
-            items(playlists) { playlist ->
+            items(
+                items = playlists,
+                key = { it.id },
+                contentType = { "playlist" }
+            ) { playlist ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -6,8 +6,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.PlaybackMode
 import com.example.reproductor.presentation.components.formatDuration
@@ -26,8 +31,20 @@ fun PlayerScreen(
     onBackClick: () -> Unit,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
-    val playerState by viewModel.playerState.collectAsState()
-    val playbackMode by viewModel.playbackMode.collectAsState()
+    val playerState by viewModel.playerState.collectAsStateWithLifecycle()
+    val playbackMode by viewModel.playbackMode.collectAsStateWithLifecycle()
+    var isUserSeeking by remember { mutableStateOf(false) }
+    var sliderPosition by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(playerState.currentPosition, playerState.duration, isUserSeeking) {
+        if (!isUserSeeking) {
+            sliderPosition = if (playerState.duration > 0L) {
+                (playerState.currentPosition.toFloat() / playerState.duration.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+        }
+    }
     val currentSong = playerState.currentSong
 
     Scaffold(
@@ -110,12 +127,15 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Slider(
-                    value = if (playerState.duration > 0) {
-                        playerState.currentPosition.toFloat() / playerState.duration.toFloat()
-                    } else 0f,
+                    value = sliderPosition,
                     onValueChange = { value ->
-                        val newPosition = (value * playerState.duration).toLong()
+                        isUserSeeking = true
+                        sliderPosition = value
+                    },
+                    onValueChangeFinished = {
+                        val newPosition = (sliderPosition * playerState.duration).toLong()
                         viewModel.seekTo(newPosition)
+                        isUserSeeking = false
                     },
                     modifier = Modifier.fillMaxWidth()
                 )

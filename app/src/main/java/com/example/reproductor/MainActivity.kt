@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
 import com.example.reproductor.presentation.navigation.Screen
@@ -102,15 +101,13 @@ fun MusicPlayerApp() {
                     BottomNavigationBar(
                         currentRoute = currentRoute,
                         onHomeClick = {
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(Screen.Home.route) { inclusive = true }
-                            }
+                            navController.navigateSingleTopTo(Screen.Home.route)
                         },
                         onLibraryClick = {
-                            navController.navigate(Screen.Library.route)
+                            navController.navigateSingleTopTo(Screen.Library.route)
                         },
                         onSearchClick = {
-                            navController.navigate(Screen.Search.route)
+                            navController.navigateSingleTopTo(Screen.Search.route)
                         }
                     )
                 }
@@ -202,3 +199,13 @@ fun PermissionScreen(
 }
 
 
+
+private fun androidx.navigation.NavHostController.navigateSingleTopTo(route: String) {
+    navigate(route) {
+        launchSingleTop = true
+        restoreState = true
+        popUpTo(graph.startDestinationId) {
+            saveState = true
+        }
+    }
+}
