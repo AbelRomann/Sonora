@@ -25,11 +25,12 @@ class MediaStoreDataSource @Inject constructor(
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.ARTIST_ID
+            MediaStore.Audio.Media.ARTIST_ID,
+            MediaStore.Audio.Media.DATE_ADDED
         )
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
+        val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} ASC"
 
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -46,6 +47,7 @@ class MediaStoreDataSource @Inject constructor(
             val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val artistIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST_ID)
+            val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
@@ -56,8 +58,9 @@ class MediaStoreDataSource @Inject constructor(
                 val path = cursor.getString(dataColumn)
                 val albumId = cursor.getLong(albumIdColumn)
                 val artistId = cursor.getLong(artistIdColumn)
+                val dateAdded = cursor.getLong(dateAddedColumn) * 1000L
 
-                val albumArt = getAlbumArtUri(albumId).toString()
+                val albumArt = getSongArtUri(id) ?: getAlbumArtUri(albumId)?.toString()
 
                 songs.add(
                     SongEntity(
@@ -69,7 +72,8 @@ class MediaStoreDataSource @Inject constructor(
                         path = path,
                         albumId = albumId,
                         artistId = artistId,
-                        albumArt = albumArt
+                        albumArt = albumArt,
+                        dateAdded = dateAdded
                     )
                 )
             }
@@ -111,7 +115,7 @@ class MediaStoreDataSource @Inject constructor(
                 val songCount = cursor.getInt(songCountColumn)
                 val year = cursor.getInt(yearColumn).takeIf { it > 0 }
 
-                val albumArt = getAlbumArtUri(id).toString()
+                val albumArt = getAlbumArtUri(id)?.toString()
 
                 albums.add(
                     AlbumEntity(
@@ -130,10 +134,23 @@ class MediaStoreDataSource @Inject constructor(
         albums
     }
 
-    private fun getAlbumArtUri(albumId: Long): Uri {
-        return ContentUris.withAppendedId(
+    private fun getAlbumArtUri(albumId: Long): Uri? {
+        val uri = ContentUris.withAppendedId(
             Uri.parse("content://media/external/audio/albumart"),
             albumId
         )
+
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.close()
+            uri
+        }.getOrNull()
+    }
+
+    private fun getSongArtUri(songId: Long): String? {
+        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, songId)
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.close()
+            "$uri"
+        }.getOrNull()
     }
 }
