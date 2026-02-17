@@ -96,6 +96,25 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
+        if (songIds.isEmpty()) return
+        viewModelScope.launch {
+            songIds.forEach { songId ->
+                musicRepository.addSongToPlaylist(playlistId, songId)
+            }
+        }
+    }
+
+    fun createPlaylistAndAddSongs(name: String, songIds: List<Long>) {
+        if (name.isBlank() || songIds.isEmpty()) return
+        viewModelScope.launch {
+            val playlistId = musicRepository.createPlaylist(name.trim())
+            songIds.forEach { songId ->
+                musicRepository.addSongToPlaylist(playlistId, songId)
+            }
+        }
+    }
+
     fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
             musicRepository.moveSongInPlaylist(playlistId, fromIndex, toIndex)

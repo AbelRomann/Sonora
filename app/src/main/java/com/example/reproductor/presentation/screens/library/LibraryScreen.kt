@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -32,6 +33,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.reproductor.domain.model.Playlist
+import com.example.reproductor.domain.model.Song
 import com.example.reproductor.presentation.components.SongItem
 import com.example.reproductor.presentation.library.LibraryViewModel
 
@@ -58,13 +61,41 @@ fun LibraryScreen(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    val selectedSongIds = remember { mutableStateListOf<Long>() }
+
+    fun toggleSongSelection(songId: Long) {
+        if (selectedSongIds.contains(songId)) {
+            selectedSongIds.remove(songId)
+        } else {
+            selectedSongIds.add(songId)
+        }
+
+        if (selectedSongIds.isEmpty()) {
+            selectionMode = false
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Biblioteca") },
+                title = {
+                    Text(
+                        if (selectionMode) "${selectedSongIds.size} seleccionadas" else "Biblioteca"
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(
+                        onClick = {
+                            if (selectionMode) {
+                                selectedSongIds.clear()
+                                selectionMode = false
+                            } else {
+                                onBackClick()
+                            }
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
@@ -72,7 +103,7 @@ fun LibraryScreen(
                     }
                 },
                 actions = {
-                    if (selectedTab == LibraryTab.SONGS && songs.isNotEmpty()) {
+                    if (selectedTab == LibraryTab.SONGS && !selectionMode && songs.isNotEmpty()) {
                         IconButton(
                             onClick = {
                                 viewModel.playSongs(songs, 0)
@@ -85,6 +116,19 @@ fun LibraryScreen(
                             )
                         }
                     }
+
+                    if (selectedTab == LibraryTab.SONGS && selectionMode) {
+                        IconButton(
+                            onClick = { showAddToPlaylistDialog = true },
+                            enabled = selectedSongIds.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Agregar a playlist"
+                            )
+                        }
+                    }
+
                     if (selectedTab == LibraryTab.PLAYLISTS) {
                         IconButton(onClick = { showCreateDialog = true }) {
                             Icon(imageVector = Icons.Default.Add, contentDescription = "Crear playlist")
@@ -102,12 +146,18 @@ fun LibraryScreen(
             TabRow(selectedTabIndex = selectedTab.ordinal) {
                 Tab(
                     selected = selectedTab == LibraryTab.SONGS,
-                    onClick = { selectedTab = LibraryTab.SONGS },
+                    onClick = {
+                        selectedTab = LibraryTab.SONGS
+                    },
                     text = { Text("Canciones") }
                 )
                 Tab(
                     selected = selectedTab == LibraryTab.PLAYLISTS,
-                    onClick = { selectedTab = LibraryTab.PLAYLISTS },
+                    onClick = {
+                        selectedTab = LibraryTab.PLAYLISTS
+                        selectedSongIds.clear()
+                        selectionMode = false
+                    },
                     text = { Text("Playlists") }
                 )
             }
@@ -115,10 +165,21 @@ fun LibraryScreen(
             if (selectedTab == LibraryTab.SONGS) {
                 SongsTab(
                     songs = songs,
+                    selectedSongIds = selectedSongIds.toSet(),
                     onSongClick = { song ->
-                        val index = songs.indexOf(song)
-                        viewModel.playSongs(songs, index)
-                        onNavigateToPlayer()
+                        if (selectionMode) {
+                            toggleSongSelection(song.id)
+                        } else {
+                            val index = songs.indexOf(song)
+                            viewModel.playSongs(songs, index)
+                            onNavigateToPlayer()
+                        }
+                    },
+                    onSongLongClick = { song ->
+                        if (!selectionMode) {
+                            selectionMode = true
+                        }
+                        toggleSongSelection(song.id)
                     }
                 )
             } else {
@@ -140,12 +201,35 @@ fun LibraryScreen(
             }
         )
     }
+
+    if (showAddToPlaylistDialog) {
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onDismiss = { showAddToPlaylistDialog = false },
+            onConfirm = { playlistId ->
+                val songsToAdd = selectedSongIds.toList()
+                viewModel.addSongsToPlaylist(playlistId, songsToAdd)
+                selectedSongIds.clear()
+                selectionMode = false
+                showAddToPlaylistDialog = false
+            },
+            onCreateAndConfirm = { name ->
+                val songsToAdd = selectedSongIds.toList()
+                viewModel.createPlaylistAndAddSongs(name, songsToAdd)
+                selectedSongIds.clear()
+                selectionMode = false
+                showAddToPlaylistDialog = false
+            }
+        )
+    }
 }
 
 @Composable
 private fun SongsTab(
-    songs: List<com.example.reproductor.domain.model.Song>,
-    onSongClick: (com.example.reproductor.domain.model.Song) -> Unit
+    songs: List<Song>,
+    selectedSongIds: Set<Long>,
+    onSongClick: (Song) -> Unit,
+    onSongLongClick: (Song) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -169,7 +253,7 @@ private fun SongsTab(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "En tu biblioteca",
+                        text = "Mantén presionado para seleccionar",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
@@ -182,7 +266,12 @@ private fun SongsTab(
             key = { it.id },
             contentType = { "song" }
         ) { song ->
-            SongItem(song = song, onClick = { onSongClick(song) })
+            SongItem(
+                song = song,
+                onClick = { onSongClick(song) },
+                onLongClick = { onSongLongClick(song) },
+                isSelected = selectedSongIds.contains(song.id)
+            )
         }
 
         if (songs.isEmpty()) {
@@ -202,6 +291,70 @@ private fun SongsTab(
             }
         }
     }
+}
+
+@Composable
+private fun AddToPlaylistDialog(
+    playlists: List<Playlist>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit,
+    onCreateAndConfirm: (String) -> Unit
+) {
+    var selectedPlaylistId by remember(playlists) { mutableStateOf(playlists.firstOrNull()?.id) }
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Agregar a playlist") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (playlists.isEmpty()) {
+                    Text("No tienes playlists. Crea una para continuar.")
+                } else {
+                    playlists.forEach { playlist ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedPlaylistId == playlist.id,
+                                onClick = { selectedPlaylistId = playlist.id }
+                            )
+                            Text("${playlist.name} (${playlist.songCount})")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("O crea una nueva")
+                TextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    placeholder = { Text("Nombre de playlist") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (newPlaylistName.isNotBlank()) {
+                        onCreateAndConfirm(newPlaylistName)
+                    } else {
+                        selectedPlaylistId?.let(onConfirm)
+                    }
+                },
+                enabled = newPlaylistName.isNotBlank() || selectedPlaylistId != null
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable
