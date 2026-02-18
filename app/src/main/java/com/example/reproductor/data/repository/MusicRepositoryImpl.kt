@@ -133,22 +133,25 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addSongToPlaylist(playlistId: Long, songId: Long) {
+        addSongsToPlaylist(playlistId, listOf(songId))
+    }
+
+    override suspend fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
+        if (songIds.isEmpty()) return
         withContext(Dispatchers.IO) {
-            val nextPosition = playlistDao.getMaxPosition(playlistId) + 1
-            playlistDao.insertPlaylistSong(
-                PlaylistSongCrossRef(
-                    playlistId = playlistId,
-                    songId = songId,
-                    position = nextPosition
-                )
-            )
+            playlistDao.addSongsToPlaylist(playlistId, songIds)
+        }
+    }
+
+    override suspend fun createPlaylistAndAddSongs(name: String, songIds: List<Long>): Long {
+        return withContext(Dispatchers.IO) {
+            playlistDao.createPlaylistAndAddSongs(name = name, songIds = songIds)
         }
     }
 
     override suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
         withContext(Dispatchers.IO) {
-            playlistDao.deleteSongFromPlaylist(playlistId, songId)
-            normalizePlaylistPositions(playlistId)
+            playlistDao.deleteSongAndReindex(playlistId, songId)
         }
     }
 
@@ -163,8 +166,8 @@ class MusicRepositoryImpl @Inject constructor(
 
     override suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int) {
         withContext(Dispatchers.IO) {
-            val songIds = playlistDao.getSongIdsByPlaylist(playlistId).toMutableList()
-            if (fromIndex !in songIds.indices || toIndex !in songIds.indices || fromIndex == toIndex) {
+            val songCount = playlistDao.getPlaylistSongCount(playlistId)
+            if (fromIndex !in 0 until songCount || toIndex !in 0 until songCount || fromIndex == toIndex) {
                 return@withContext
             }
 

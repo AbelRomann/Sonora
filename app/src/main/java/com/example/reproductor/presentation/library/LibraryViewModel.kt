@@ -33,6 +33,13 @@ class LibraryViewModel @Inject constructor(
     private val playerController: MusicPlayerController
 ) : ViewModel() {
 
+    companion object {
+        private val initialRefreshLock = Any()
+
+        @Volatile
+        private var initialRefreshTriggeredInSession: Boolean = false
+    }
+
     private val refreshMutex = Mutex()
     private var refreshJob: Job? = null
 
@@ -65,11 +72,16 @@ class LibraryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    init {
+    fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
+
+    fun refreshMusicOnFirstSessionEntry() {
+        if (initialRefreshTriggeredInSession) return
+        synchronized(initialRefreshLock) {
+            if (initialRefreshTriggeredInSession) return
+            initialRefreshTriggeredInSession = true
+        }
         refreshMusic()
     }
-
-    fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
 
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
@@ -99,19 +111,14 @@ class LibraryViewModel @Inject constructor(
     fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
         if (songIds.isEmpty()) return
         viewModelScope.launch {
-            songIds.forEach { songId ->
-                musicRepository.addSongToPlaylist(playlistId, songId)
-            }
+            musicRepository.addSongsToPlaylist(playlistId, songIds)
         }
     }
 
     fun createPlaylistAndAddSongs(name: String, songIds: List<Long>) {
         if (name.isBlank() || songIds.isEmpty()) return
         viewModelScope.launch {
-            val playlistId = musicRepository.createPlaylist(name.trim())
-            songIds.forEach { songId ->
-                musicRepository.addSongToPlaylist(playlistId, songId)
-            }
+            musicRepository.createPlaylistAndAddSongs(name.trim(), songIds)
         }
     }
 
