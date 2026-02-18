@@ -18,11 +18,17 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE artistId = :artistId ORDER BY dateAdded DESC, id DESC")
     fun getSongsByArtist(artistId: Long): Flow<List<SongEntity>>
 
+    @Query("SELECT * FROM songs")
+    suspend fun getSongsSnapshot(): List<SongEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongs(songs: List<SongEntity>)
 
     @Delete
     suspend fun deleteSong(song: SongEntity)
+
+    @Query("DELETE FROM songs WHERE id IN (:songIds)")
+    suspend fun deleteSongsByIds(songIds: List<Long>)
 
     @Query("DELETE FROM songs")
     suspend fun deleteAllSongs()
