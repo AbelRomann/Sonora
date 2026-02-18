@@ -99,19 +99,14 @@ class LibraryViewModel @Inject constructor(
     fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
         if (songIds.isEmpty()) return
         viewModelScope.launch {
-            songIds.forEach { songId ->
-                musicRepository.addSongToPlaylist(playlistId, songId)
-            }
+            musicRepository.addSongsToPlaylist(playlistId, songIds)
         }
     }
 
     fun createPlaylistAndAddSongs(name: String, songIds: List<Long>) {
         if (name.isBlank() || songIds.isEmpty()) return
         viewModelScope.launch {
-            val playlistId = musicRepository.createPlaylist(name.trim())
-            songIds.forEach { songId ->
-                musicRepository.addSongToPlaylist(playlistId, songId)
-            }
+            musicRepository.createPlaylistAndAddSongs(name.trim(), songIds)
         }
     }
 
