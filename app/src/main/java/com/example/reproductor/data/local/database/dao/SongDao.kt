@@ -6,16 +6,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs ORDER BY dateAdded ASC")
+    @Query("SELECT * FROM songs ORDER BY dateAdded DESC, id DESC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
     @Query("SELECT * FROM songs WHERE id = :songId")
     suspend fun getSongById(songId: Long): SongEntity?
 
-    @Query("SELECT * FROM songs WHERE albumId = :albumId ORDER BY dateAdded ASC")
+    @Query("SELECT * FROM songs WHERE albumId = :albumId ORDER BY dateAdded DESC, id DESC")
     fun getSongsByAlbum(albumId: Long): Flow<List<SongEntity>>
 
-    @Query("SELECT * FROM songs WHERE artistId = :artistId ORDER BY dateAdded ASC")
+    @Query("SELECT * FROM songs WHERE artistId = :artistId ORDER BY dateAdded DESC, id DESC")
     fun getSongsByArtist(artistId: Long): Flow<List<SongEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -27,6 +27,6 @@ interface SongDao {
     @Query("DELETE FROM songs")
     suspend fun deleteAllSongs()
 
-    @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY dateAdded ASC")
+    @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY dateAdded DESC, id DESC")
     fun searchSongs(query: String): Flow<List<SongEntity>>
 }
