@@ -18,6 +18,8 @@ interface MusicRepository {
     fun getSongsInPlaylist(playlistId: Long): Flow<List<Song>>
     suspend fun createPlaylist(name: String): Long
     suspend fun addSongToPlaylist(playlistId: Long, songId: Long)
+    suspend fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>)
+    suspend fun createPlaylistAndAddSongs(name: String, songIds: List<Long>): Long
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long)
     suspend fun deletePlaylist(playlistId: Long)
     suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int)
