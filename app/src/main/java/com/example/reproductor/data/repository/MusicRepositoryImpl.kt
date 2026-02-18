@@ -1,11 +1,15 @@
 package com.example.reproductor.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
+import com.example.reproductor.data.local.database.MusicDatabase
 import com.example.reproductor.data.local.database.dao.AlbumDao
 import com.example.reproductor.data.local.database.dao.PlaylistDao
 import com.example.reproductor.data.local.database.dao.SongDao
+import com.example.reproductor.data.local.entities.AlbumEntity
 import com.example.reproductor.data.local.entities.PlaylistEntity
 import com.example.reproductor.data.local.entities.PlaylistSongCrossRef
+import com.example.reproductor.data.local.entities.SongEntity
 import com.example.reproductor.data.local.entities.toDomain
 import com.example.reproductor.data.source.MediaStoreDataSource
 import com.example.reproductor.domain.model.Album
@@ -25,6 +29,7 @@ import javax.inject.Singleton
 @Singleton
 class MusicRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val database: MusicDatabase,
     private val songDao: SongDao,
     private val albumDao: AlbumDao,
     private val playlistDao: PlaylistDao,
@@ -80,11 +85,10 @@ class MusicRepositoryImpl @Inject constructor(
             val songs = mediaStoreDataSource.scanMusic()
             val albums = mediaStoreDataSource.scanAlbums()
 
-            songDao.deleteAllSongs()
-            albumDao.deleteAllAlbums()
-
-            songDao.insertSongs(songs)
-            albumDao.insertAlbums(albums)
+            database.withTransaction {
+                syncSongsIncrementally(songs)
+                syncAlbumsIncrementally(albums)
+            }
 
             prefs.edit().putLong(KEY_LAST_SCAN, now).apply()
         }
@@ -94,11 +98,10 @@ class MusicRepositoryImpl @Inject constructor(
         val songs = mediaStoreDataSource.scanMusic()
         val albums = mediaStoreDataSource.scanAlbums()
 
-        songDao.deleteAllSongs()
-        albumDao.deleteAllAlbums()
-
-        songDao.insertSongs(songs)
-        albumDao.insertAlbums(albums)
+        database.withTransaction {
+            syncSongsIncrementally(songs)
+            syncAlbumsIncrementally(albums)
+        }
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_LAST_SCAN, System.currentTimeMillis()).apply()
@@ -130,22 +133,25 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addSongToPlaylist(playlistId: Long, songId: Long) {
+        addSongsToPlaylist(playlistId, listOf(songId))
+    }
+
+    override suspend fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
+        if (songIds.isEmpty()) return
         withContext(Dispatchers.IO) {
-            val nextPosition = playlistDao.getMaxPosition(playlistId) + 1
-            playlistDao.insertPlaylistSong(
-                PlaylistSongCrossRef(
-                    playlistId = playlistId,
-                    songId = songId,
-                    position = nextPosition
-                )
-            )
+            playlistDao.addSongsToPlaylist(playlistId, songIds)
+        }
+    }
+
+    override suspend fun createPlaylistAndAddSongs(name: String, songIds: List<Long>): Long {
+        return withContext(Dispatchers.IO) {
+            playlistDao.createPlaylistAndAddSongs(name = name, songIds = songIds)
         }
     }
 
     override suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
         withContext(Dispatchers.IO) {
-            playlistDao.deleteSongFromPlaylist(playlistId, songId)
-            normalizePlaylistPositions(playlistId)
+            playlistDao.deleteSongAndReindex(playlistId, songId)
         }
     }
 
@@ -160,8 +166,8 @@ class MusicRepositoryImpl @Inject constructor(
 
     override suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int) {
         withContext(Dispatchers.IO) {
-            val songIds = playlistDao.getSongIdsByPlaylist(playlistId).toMutableList()
-            if (fromIndex !in songIds.indices || toIndex !in songIds.indices || fromIndex == toIndex) {
+            val songCount = playlistDao.getPlaylistSongCount(playlistId)
+            if (fromIndex !in 0 until songCount || toIndex !in 0 until songCount || fromIndex == toIndex) {
                 return@withContext
             }
 
@@ -171,6 +177,50 @@ class MusicRepositoryImpl @Inject constructor(
             songIds.forEachIndexed { index, songId ->
                 playlistDao.updateSongPosition(playlistId, songId, index)
             }
+        }
+    }
+
+    private suspend fun syncSongsIncrementally(newSongs: List<SongEntity>) {
+        val currentSongs = songDao.getSongsSnapshot()
+        val currentSongsById = currentSongs.associateBy { it.id }
+        val currentSongIds = currentSongsById.keys
+        val newSongsById = newSongs.associateBy { it.id }
+        val newSongIds = newSongsById.keys
+
+        val removedSongIds = currentSongIds - newSongIds
+        val songsToUpsert = newSongs.filter { newSong ->
+            val currentSong = currentSongsById[newSong.id]
+            currentSong == null || currentSong != newSong
+        }
+
+        if (removedSongIds.isNotEmpty()) {
+            songDao.deleteSongsByIds(removedSongIds.toList())
+        }
+
+        if (songsToUpsert.isNotEmpty()) {
+            songDao.insertSongs(songsToUpsert)
+        }
+    }
+
+    private suspend fun syncAlbumsIncrementally(newAlbums: List<AlbumEntity>) {
+        val currentAlbums = albumDao.getAlbumsSnapshot()
+        val currentAlbumsById = currentAlbums.associateBy { it.id }
+        val currentAlbumIds = currentAlbumsById.keys
+        val newAlbumsById = newAlbums.associateBy { it.id }
+        val newAlbumIds = newAlbumsById.keys
+
+        val removedAlbumIds = currentAlbumIds - newAlbumIds
+        val albumsToUpsert = newAlbums.filter { newAlbum ->
+            val currentAlbum = currentAlbumsById[newAlbum.id]
+            currentAlbum == null || currentAlbum != newAlbum
+        }
+
+        if (removedAlbumIds.isNotEmpty()) {
+            albumDao.deleteAlbumsByIds(removedAlbumIds.toList())
+        }
+
+        if (albumsToUpsert.isNotEmpty()) {
+            albumDao.insertAlbums(albumsToUpsert)
         }
     }
 

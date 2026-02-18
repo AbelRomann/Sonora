@@ -15,9 +15,15 @@ interface AlbumDao {
     @Query("SELECT * FROM albums WHERE artistId = :artistId ORDER BY name ASC")
     fun getAlbumsByArtist(artistId: Long): Flow<List<AlbumEntity>>
 
+    @Query("SELECT * FROM albums")
+    suspend fun getAlbumsSnapshot(): List<AlbumEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAlbums(albums: List<AlbumEntity>)
 
     @Query("DELETE FROM albums")
     suspend fun deleteAllAlbums()
+
+    @Query("DELETE FROM albums WHERE id IN (:albumIds)")
+    suspend fun deleteAlbumsByIds(albumIds: List<Long>)
 }
