@@ -152,7 +152,8 @@ private fun PlaylistSongRow(
                 modifier = Modifier
                     .weight(1f)
                     .clickable(onClick = onPlay)
-                    .padding(vertical = 2.dp, end = 8.dp)
+                    .padding(vertical = 2.dp)
+                    .padding(end = 8.dp)
             ) {
                 Text(
                     text = song.title,
