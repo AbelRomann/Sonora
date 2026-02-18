@@ -3,6 +3,7 @@ package com.example.reproductor.data.source
 import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import com.example.reproductor.data.local.entities.AlbumEntity
 import com.example.reproductor.data.local.entities.SongEntity
@@ -30,7 +31,7 @@ class MediaStoreDataSource @Inject constructor(
         )
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} ASC"
+        val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC, ${MediaStore.Audio.Media._ID} DESC"
 
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -60,7 +61,7 @@ class MediaStoreDataSource @Inject constructor(
                 val artistId = cursor.getLong(artistIdColumn)
                 val dateAdded = cursor.getLong(dateAddedColumn) * 1000L
 
-                val albumArt = getSongArtUri(id) ?: getAlbumArtUri(albumId)?.toString()
+                val albumArt = getSongArtUri(id, albumId)
 
                 songs.add(
                     SongEntity(
@@ -134,23 +135,23 @@ class MediaStoreDataSource @Inject constructor(
         albums
     }
 
-    private fun getAlbumArtUri(albumId: Long): Uri? {
-        val uri = ContentUris.withAppendedId(
+    private fun getAlbumArtUri(albumId: Long): Uri {
+        return ContentUris.withAppendedId(
             Uri.parse("content://media/external/audio/albumart"),
             albumId
         )
-
-        return runCatching {
-            context.contentResolver.openInputStream(uri)?.close()
-            uri
-        }.getOrNull()
     }
 
-    private fun getSongArtUri(songId: Long): String? {
-        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, songId)
-        return runCatching {
-            context.contentResolver.openInputStream(uri)?.close()
-            "$uri"
-        }.getOrNull()
+    private fun getSongArtUri(songId: Long, albumId: Long): String {
+        val songArtworkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Uri.withAppendedPath(
+                ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, songId),
+                "albumart"
+            )
+        } else {
+            getAlbumArtUri(albumId)
+        }
+
+        return songArtworkUri.toString()
     }
 }
