@@ -8,7 +8,6 @@ import com.example.reproductor.data.local.database.dao.PlaylistDao
 import com.example.reproductor.data.local.database.dao.SongDao
 import com.example.reproductor.data.local.entities.AlbumEntity
 import com.example.reproductor.data.local.entities.PlaylistEntity
-import com.example.reproductor.data.local.entities.PlaylistSongCrossRef
 import com.example.reproductor.data.local.entities.SongEntity
 import com.example.reproductor.data.local.entities.toDomain
 import com.example.reproductor.data.source.MediaStoreDataSource
@@ -171,12 +170,7 @@ class MusicRepositoryImpl @Inject constructor(
                 return@withContext
             }
 
-            val movedSongId = songIds.removeAt(fromIndex)
-            songIds.add(toIndex, movedSongId)
-
-            songIds.forEachIndexed { index, songId ->
-                playlistDao.updateSongPosition(playlistId, songId, index)
-            }
+            playlistDao.moveSongInPlaylist(playlistId, fromIndex, toIndex)
         }
     }
 
