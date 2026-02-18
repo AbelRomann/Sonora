@@ -27,12 +27,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -49,8 +49,8 @@ fun PlaylistDetailScreen(
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val playlistSongsFlow = remember(playlistId) { viewModel.getSongsForPlaylist(playlistId) }
-    val playlistSongs by playlistSongsFlow.collectAsState(initial = emptyList())
-    val allSongs by viewModel.songs.collectAsState()
+    val playlistSongs by playlistSongsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val allSongs by viewModel.songs.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -88,18 +88,34 @@ fun PlaylistDetailScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                itemsIndexed(playlistSongs) { index, song ->
+                itemsIndexed(
+                    items = playlistSongs,
+                    key = { _, song -> song.id }
+                ) { index, song ->
+                    val onPlay = remember(viewModel, playlistSongs, index, onNavigateToPlayer) {
+                        {
+                            viewModel.playSongs(playlistSongs, index)
+                            onNavigateToPlayer()
+                        }
+                    }
+                    val onRemove = remember(viewModel, playlistId, song.id) {
+                        { viewModel.removeSongFromPlaylist(playlistId, song.id) }
+                    }
+                    val onMoveUp = remember(viewModel, playlistId, index) {
+                        { viewModel.moveSongInPlaylist(playlistId, index, index - 1) }
+                    }
+                    val onMoveDown = remember(viewModel, playlistId, index) {
+                        { viewModel.moveSongInPlaylist(playlistId, index, index + 1) }
+                    }
+
                     PlaylistSongRow(
                         song = song,
                         canMoveUp = index > 0,
                         canMoveDown = index < playlistSongs.lastIndex,
-                        onPlay = {
-                            viewModel.playSongs(playlistSongs, index)
-                            onNavigateToPlayer()
-                        },
-                        onRemove = { viewModel.removeSongFromPlaylist(playlistId, song.id) },
-                        onMoveUp = { viewModel.moveSongInPlaylist(playlistId, index, index - 1) },
-                        onMoveDown = { viewModel.moveSongInPlaylist(playlistId, index, index + 1) }
+                        onPlay = onPlay,
+                        onRemove = onRemove,
+                        onMoveUp = onMoveUp,
+                        onMoveDown = onMoveDown
                     )
                 }
             }
@@ -186,7 +202,10 @@ private fun AddSongsDialog(
         title = { Text("Agregar canciones") },
         text = {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                itemsIndexed(availableSongs) { _, song ->
+                itemsIndexed(
+                    items = availableSongs,
+                    key = { _, song -> song.id }
+                ) { _, song ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically

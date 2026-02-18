@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,8 +24,11 @@ fun SearchScreen(
     onBackClick: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+
+    val onQueryChange = remember(viewModel) { { query: String -> viewModel.onSearchQueryChanged(query) } }
+    val onClearSearch = remember(viewModel) { { viewModel.clearSearch() } }
 
     Scaffold(
         topBar = {
@@ -32,7 +36,7 @@ fun SearchScreen(
                 title = {
                     TextField(
                         value = searchQuery,
-                        onValueChange = { viewModel.onSearchQueryChanged(it) },
+                        onValueChange = onQueryChange,
                         placeholder = { Text("Buscar canciones...") },
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
@@ -50,7 +54,7 @@ fun SearchScreen(
                         },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.clearSearch() }) {
+                                IconButton(onClick = onClearSearch) {
                                     Icon(
                                         imageVector = Icons.Default.Clear,
                                         contentDescription = "Clear"
@@ -129,13 +133,20 @@ fun SearchScreen(
                         )
                     }
 
-                    items(searchResults) { song ->
-                        SongItem(
-                            song = song,
-                            onClick = {
+                    items(
+                        items = searchResults,
+                        key = { it.id }
+                    ) { song ->
+                        val onSongClick = remember(viewModel, song.id, onNavigateToPlayer) {
+                            {
                                 viewModel.playSong(song)
                                 onNavigateToPlayer()
                             }
+                        }
+
+                        SongItem(
+                            song = song,
+                            onClick = onSongClick
                         )
                     }
                 }

@@ -9,8 +9,9 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,8 +30,8 @@ fun AlbumScreen(
     onBackClick: () -> Unit,
     viewModel: AlbumViewModel = hiltViewModel()
 ) {
-    val album by viewModel.album.collectAsState()
-    val songs by viewModel.songs.collectAsState()
+    val album by viewModel.album.collectAsStateWithLifecycle()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -133,13 +134,20 @@ fun AlbumScreen(
             }
 
             // Canciones
-            itemsIndexed(songs) { index, song ->
-                SongItem(
-                    song = song,
-                    onClick = {
+            itemsIndexed(
+                items = songs,
+                key = { _, song -> song.id }
+            ) { index, song ->
+                val onSongClick = remember(viewModel, index, onNavigateToPlayer) {
+                    {
                         viewModel.playSongs(index)
                         onNavigateToPlayer()
                     }
+                }
+
+                SongItem(
+                    song = song,
+                    onClick = onSongClick
                 )
             }
         }
