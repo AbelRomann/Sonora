@@ -33,6 +33,13 @@ class LibraryViewModel @Inject constructor(
     private val playerController: MusicPlayerController
 ) : ViewModel() {
 
+    companion object {
+        private val initialRefreshLock = Any()
+
+        @Volatile
+        private var initialRefreshTriggeredInSession: Boolean = false
+    }
+
     private val refreshMutex = Mutex()
     private var refreshJob: Job? = null
 
@@ -65,11 +72,16 @@ class LibraryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    init {
+    fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
+
+    fun refreshMusicOnFirstSessionEntry() {
+        if (initialRefreshTriggeredInSession) return
+        synchronized(initialRefreshLock) {
+            if (initialRefreshTriggeredInSession) return
+            initialRefreshTriggeredInSession = true
+        }
         refreshMusic()
     }
-
-    fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
 
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
