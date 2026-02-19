@@ -8,15 +8,37 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
@@ -38,22 +60,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         checkAndRequestPermission()
 
         setContent {
             ReproductorTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    if (hasPermission) {
-                        MusicPlayerApp()
-                    } else {
-                        PermissionScreen(
-                            onRequestPermission = { checkAndRequestPermission() }
-                        )
-                    }
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    if (hasPermission) MusicPlayerApp() else PermissionScreen(onRequestPermission = ::checkAndRequestPermission)
                 }
             }
         }
@@ -66,18 +78,15 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
-        when {
-            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                hasPermission = true
-            }
-            else -> {
-                requestPermissionLauncher.launch(permission)
-            }
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            hasPermission = true
+        } else {
+            requestPermissionLauncher.launch(permission)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun MusicPlayerApp() {
     val navController = rememberAnimatedNavController()
@@ -86,126 +95,73 @@ fun MusicPlayerApp() {
 
     Scaffold(
         bottomBar = {
-            Column {
-                // Mini Player (se muestra en todas las pantallas excepto en el Player completo)
-                if (!showPlayer) {
-                    MiniPlayer(
-                        onExpand = {
-                            navController.navigate(Screen.Player.route)
-                        }
-                    )
-                }
-
-                // Bottom Navigation
-                if (!showPlayer) {
-                    BottomNavigationBar(
-                        currentRoute = currentRoute,
-                        onHomeClick = {
-                            navController.navigateSingleTopTo(Screen.Home.route)
-                        },
-                        onLibraryClick = {
-                            navController.navigateSingleTopTo(Screen.Library.route)
-                        },
-                        onSearchClick = {
-                            navController.navigateSingleTopTo(Screen.Search.route)
-                        }
-                    )
+            if (!showPlayer) {
+                Column(modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
+                    MiniPlayer(onExpand = { navController.navigate(Screen.Player.route) })
+                    BottomNavigationBar(currentRoute = currentRoute, navController = navController)
                 }
             }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues)) {
-            NavGraph(
-                navController = navController,
-                onNavigateToPlayer = {
-                    navController.navigate(Screen.Player.route)
-                }
-            )
+            NavGraph(navController = navController, onNavigateToPlayer = { navController.navigate(Screen.Player.route) })
         }
     }
 }
 
 @Composable
-fun BottomNavigationBar(
-    currentRoute: String?,
-    onHomeClick: () -> Unit,
-    onLibraryClick: () -> Unit,
-    onSearchClick: () -> Unit
-) {
+private fun BottomNavigationBar(currentRoute: String?, navController: NavHostController) {
     NavigationBar {
         NavigationBarItem(
             selected = currentRoute == Screen.Home.route,
-            onClick = onHomeClick,
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            onClick = { navController.navigateSingleTopTo(Screen.Home.route) },
+            icon = { Icon(Icons.Default.Home, contentDescription = null) },
             label = { Text("Inicio") }
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Library.route,
-            onClick = onLibraryClick,
-            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") },
+            onClick = { navController.navigateSingleTopTo(Screen.Library.route) },
+            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
             label = { Text("Biblioteca") }
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Search.route,
-            onClick = onSearchClick,
-            icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+            onClick = { navController.navigateSingleTopTo(Screen.Search.route) },
+            icon = { Icon(Icons.Default.Search, contentDescription = null) },
             label = { Text("Buscar") }
         )
     }
 }
 
 @Composable
-fun PermissionScreen(
-    onRequestPermission: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
+fun PermissionScreen(onRequestPermission: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(28.dp)) {
             Icon(
                 imageVector = Icons.Default.MusicNote,
                 contentDescription = null,
-                modifier = Modifier.size(80.dp),
+                modifier = Modifier.size(72.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
+            Text(text = "Permiso requerido", style = MaterialTheme.typography.headlineSmall)
             Text(
-                text = "Permiso necesario",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Necesitamos acceso a tu música para poder reproducirla",
+                text = "Necesitamos acceso a tu audio para construir tu biblioteca musical.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             Button(onClick = onRequestPermission) {
-                Text("Conceder permiso")
+                Text("Conceder acceso")
             }
         }
     }
 }
 
-
-
-private fun androidx.navigation.NavHostController.navigateSingleTopTo(route: String) {
+private fun NavHostController.navigateSingleTopTo(route: String) {
     navigate(route) {
         launchSingleTop = true
         restoreState = true
-        popUpTo(graph.startDestinationId) {
-            saveState = true
-        }
+        popUpTo(graph.startDestinationId) { saveState = true }
     }
 }
