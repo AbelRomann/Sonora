@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +46,7 @@ fun HomeScreen(
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val lightListModeEnabled by viewModel.lightListModeEnabled.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.refreshMusicOnFirstSessionEntry() }
 
@@ -60,6 +62,13 @@ fun HomeScreen(
             TopAppBar(
                 title = {},
                 actions = {
+                    IconButton(onClick = { viewModel.toggleLightListMode() }) {
+                        Icon(
+                            imageVector = Icons.Default.Photo,
+                            contentDescription = if (lightListModeEnabled) "Desactivar modo lista ligera" else "Activar modo lista ligera",
+                            tint = if (lightListModeEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { viewModel.refreshMusic() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Actualizar biblioteca")
                     }
@@ -87,7 +96,11 @@ fun HomeScreen(
             }
 
             items(songs.take(20), key = { it.id }) { song ->
-                SongItem(song = song, onClick = { onSongClick(song) })
+                SongItem(
+                    song = song,
+                    onClick = { onSongClick(song) },
+                    showAlbumArt = !lightListModeEnabled
+                )
             }
 
             if (songs.isEmpty()) {
