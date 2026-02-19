@@ -2,10 +2,15 @@ package com.example.reproductor.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val Night = Color(0xFF0B1020)
+val Midnight = Color(0xFF151C30)
+val SurfaceDark = Color(0xFF1B2238)
+val SurfaceSoftDark = Color(0xFF222A44)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val CyanAccent = Color(0xFF4FD5FF)
+val PurpleAccent = Color(0xFF9C7BFF)
+val PinkAccent = Color(0xFFFF73C2)
+
+val LightBackground = Color(0xFFF4F7FF)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceSoft = Color(0xFFE8EEFF)
