@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -59,6 +60,7 @@ fun LibraryScreen(
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val lightListModeEnabled by viewModel.lightListModeEnabled.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(LibraryTab.SONGS) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
@@ -103,6 +105,16 @@ fun LibraryScreen(
                     }
                 },
                 actions = {
+                    if (selectedTab == LibraryTab.SONGS) {
+                        IconButton(onClick = { viewModel.toggleLightListMode() }) {
+                            Icon(
+                                imageVector = Icons.Default.Photo,
+                                contentDescription = if (lightListModeEnabled) "Desactivar modo lista ligera" else "Activar modo lista ligera",
+                                tint = if (lightListModeEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     if (selectedTab == LibraryTab.SONGS && !selectionMode && songs.isNotEmpty()) {
                         IconButton(
                             onClick = {
@@ -180,7 +192,8 @@ fun LibraryScreen(
                             selectionMode = true
                         }
                         toggleSongSelection(song.id)
-                    }
+                    },
+                    lightListModeEnabled = lightListModeEnabled
                 )
             } else {
                 PlaylistsTab(
@@ -229,7 +242,8 @@ private fun SongsTab(
     songs: List<Song>,
     selectedSongIds: Set<Long>,
     onSongClick: (Song) -> Unit,
-    onSongLongClick: (Song) -> Unit
+    onSongLongClick: (Song) -> Unit,
+    lightListModeEnabled: Boolean
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
@@ -270,7 +284,8 @@ private fun SongsTab(
                 song = song,
                 onClick = { onSongClick(song) },
                 onLongClick = { onSongLongClick(song) },
-                isSelected = selectedSongIds.contains(song.id)
+                isSelected = selectedSongIds.contains(song.id),
+                showAlbumArt = !lightListModeEnabled
             )
         }
 

@@ -37,7 +37,8 @@ fun SongItem(
     onLongClick: (() -> Unit)? = null,
     onMoreClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    isSelected: Boolean = false
+    isSelected: Boolean = false,
+    showAlbumArt: Boolean = true
 ) {
     Card(
         modifier = modifier
@@ -49,7 +50,7 @@ fun SongItem(
         )
     ) {
         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (!song.albumArt.isNullOrBlank()) {
+            if (showAlbumArt && !song.albumArt.isNullOrBlank()) {
                 AsyncImage(
                     model = song.albumArt,
                     contentDescription = null,
@@ -63,8 +64,8 @@ fun SongItem(
                     imageVector = Icons.Default.MusicNote,
                     contentDescription = null,
                     modifier = Modifier
-                        .size(58.dp)
-                        .padding(12.dp),
+                        .size(if (showAlbumArt) 58.dp else 20.dp)
+                        .padding(if (showAlbumArt) 12.dp else 0.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
