@@ -171,28 +171,28 @@ private fun PlaylistSongRow(
             }
 
             Row(
-                modifier = Modifier.width(140.dp),
-                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.width(144.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val enabledTint = MaterialTheme.colorScheme.onSurface
                 val disabledTint = MaterialTheme.colorScheme.onSurfaceVariant
 
-                IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+                IconButton(onClick = onMoveUp, enabled = canMoveUp, modifier = Modifier.width(44.dp)) {
                     Icon(
                         Icons.Default.ArrowUpward,
                         contentDescription = "Subir",
                         tint = if (canMoveUp) enabledTint else disabledTint
                     )
                 }
-                IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+                IconButton(onClick = onMoveDown, enabled = canMoveDown, modifier = Modifier.width(44.dp)) {
                     Icon(
                         Icons.Default.ArrowDownward,
                         contentDescription = "Bajar",
                         tint = if (canMoveDown) enabledTint else disabledTint
                     )
                 }
-                IconButton(onClick = onRemove) {
+                IconButton(onClick = onRemove, modifier = Modifier.width(44.dp)) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar canción")
                 }
             }
