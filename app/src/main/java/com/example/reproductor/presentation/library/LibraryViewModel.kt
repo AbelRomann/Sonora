@@ -72,6 +72,10 @@ class LibraryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+
+    private val _lightListModeEnabled = MutableStateFlow(true)
+    val lightListModeEnabled: StateFlow<Boolean> = _lightListModeEnabled.asStateFlow()
+
     fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
 
     fun refreshMusicOnFirstSessionEntry() {
@@ -151,6 +155,15 @@ class LibraryViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+
+    fun setLightListMode(enabled: Boolean) {
+        _lightListModeEnabled.value = enabled
+    }
+
+    fun toggleLightListMode() {
+        _lightListModeEnabled.value = !_lightListModeEnabled.value
     }
 
     fun clearError() {
