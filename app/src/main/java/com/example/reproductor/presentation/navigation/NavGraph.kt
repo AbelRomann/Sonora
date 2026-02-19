@@ -72,10 +72,7 @@ fun NavGraph(
         ) {
             HomeScreen(
                 onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToLibrary = { navController.navigate(Screen.Library.route) },
-                onNavigateToAlbum = { albumId ->
-                    navController.navigate(Screen.Album.createRoute(albumId))
-                }
+                onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
             )
         }
 
