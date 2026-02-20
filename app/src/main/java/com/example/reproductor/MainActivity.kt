@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -127,6 +128,12 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
             onClick = { navController.navigateSingleTopTo(Screen.Search.route) },
             icon = { Icon(Icons.Default.Search, contentDescription = null) },
             label = { Text("Buscar") }
+        )
+        NavigationBarItem(
+            selected = currentRoute == Screen.Showcase.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Showcase.route) },
+            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+            label = { Text("Soundwave") }
         )
     }
 }
