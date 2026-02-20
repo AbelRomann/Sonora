@@ -7,7 +7,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,7 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +44,7 @@ import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
 import com.example.reproductor.presentation.navigation.Screen
 import com.example.reproductor.ui.theme.ReproductorTheme
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -86,10 +86,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun MusicPlayerApp() {
-    val navController = rememberAnimatedNavController()
+    val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val showPlayer = currentRoute == Screen.Player.route
 
@@ -125,10 +124,16 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
             label = { Text("Biblioteca") }
         )
         NavigationBarItem(
-            selected = currentRoute == Screen.Search.route,
-            onClick = { navController.navigateSingleTopTo(Screen.Search.route) },
-            icon = { Icon(Icons.Default.Search, contentDescription = null) },
-            label = { Text("Buscar") }
+            selected = currentRoute == Screen.Playlists.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Playlists.route) },
+            icon = { Icon(Icons.Default.GridView, contentDescription = null) },
+            label = { Text("Playlists") }
+        )
+        NavigationBarItem(
+            selected = currentRoute == Screen.Artists.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Artists.route) },
+            icon = { Icon(Icons.Default.People, contentDescription = null) },
+            label = { Text("Artistas") }
         )
     }
 }
