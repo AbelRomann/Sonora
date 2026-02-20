@@ -15,6 +15,7 @@ import com.example.reproductor.presentation.screens.library.LibraryScreen
 import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
+import com.example.reproductor.presentation.screens.showcase.ShowcaseScreen
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 
@@ -23,6 +24,7 @@ sealed class Screen(val route: String) {
     object Library : Screen("library")
     object Player : Screen("player")
     object Search : Screen("search")
+    object Showcase : Screen("showcase")
     object Album : Screen("album/{albumId}") {
         fun createRoute(albumId: Long) = "album/$albumId"
     }
@@ -124,6 +126,10 @@ fun NavGraph(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.Showcase.route) {
+            ShowcaseScreen()
         }
 
         composable(
