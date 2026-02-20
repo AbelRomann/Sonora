@@ -1,10 +1,11 @@
 package com.example.reproductor.domain.model
 
+import androidx.compose.runtime.Stable
+
+@Stable
 data class PlayerState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,
-    val currentPosition: Long = 0L,
-    val duration: Long = 0L,
     val playbackMode: PlaybackMode = PlaybackMode.NORMAL,
     val queue: List<Song> = emptyList(),
     val currentIndex: Int = 0

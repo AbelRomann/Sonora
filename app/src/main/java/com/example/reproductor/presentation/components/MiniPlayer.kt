@@ -37,6 +37,7 @@ import com.example.reproductor.presentation.player.PlayerViewModel
 @Composable
 fun MiniPlayer(onExpand: () -> Unit, modifier: Modifier = Modifier, viewModel: PlayerViewModel = hiltViewModel()) {
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
+    val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong ?: return
 
     Surface(
@@ -49,7 +50,7 @@ fun MiniPlayer(onExpand: () -> Unit, modifier: Modifier = Modifier, viewModel: P
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             LinearProgressIndicator(
-                progress = if (playerState.duration > 0) playerState.currentPosition.toFloat() / playerState.duration.toFloat() else 0f,
+                progress = { if (playbackProgress.duration > 0) playbackProgress.currentPosition.toFloat() / playbackProgress.duration.toFloat() else 0f },
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary
             )

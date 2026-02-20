@@ -1,5 +1,8 @@
 package com.example.reproductor.domain.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class Song(
     val id: Long,
     val title: String,

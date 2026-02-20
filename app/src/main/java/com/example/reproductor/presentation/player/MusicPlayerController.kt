@@ -8,6 +8,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
 import com.example.reproductor.domain.model.PlaybackMode
 import com.example.reproductor.domain.model.Song
@@ -34,8 +35,13 @@ class MusicPlayerController @Inject constructor(
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
     private var progressUpdateJob: Job? = null
 
+    // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
+
+    // Progreso de reproducción: se actualiza cada segundo (separado para evitar recomposición completa)
+    private val _playbackProgress = MutableStateFlow(PlaybackProgress())
+    val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
 
     private val _playbackMode = MutableStateFlow(PlaybackMode.NORMAL)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode.asStateFlow()
@@ -83,7 +89,7 @@ class MusicPlayerController @Inject constructor(
         progressUpdateJob = coroutineScope.launch {
             while (isActive) {
                 updateProgress()
-                delay(1000) // Actualizar cada segundo
+                delay(1000)
             }
         }
     }
@@ -92,8 +98,8 @@ class MusicPlayerController @Inject constructor(
         mediaController?.let { controller ->
             val currentPosition = controller.currentPosition.coerceAtLeast(0)
             val duration = controller.duration.coerceAtLeast(0)
-
-            _playerState.value = _playerState.value.copy(
+            // Solo actualiza el StateFlow de progreso — no toca playerState
+            _playbackProgress.value = PlaybackProgress(
                 currentPosition = currentPosition,
                 duration = duration
             )
@@ -119,7 +125,11 @@ class MusicPlayerController @Inject constructor(
 
             _playerState.value = _playerState.value.copy(
                 currentSong = currentSong,
-                isPlaying = controller.isPlaying,
+                isPlaying = controller.isPlaying
+            )
+
+            // Sincronizar progreso inmediatamente al cambiar de pista
+            _playbackProgress.value = PlaybackProgress(
                 currentPosition = controller.currentPosition.coerceAtLeast(0),
                 duration = controller.duration.coerceAtLeast(0)
             )
@@ -154,6 +164,8 @@ class MusicPlayerController @Inject constructor(
 
     fun seekTo(position: Long) {
         mediaController?.seekTo(position)
+        // Actualizar el progreso inmediatamente para que el Slider no "salte" de vuelta
+        _playbackProgress.value = _playbackProgress.value.copy(currentPosition = position)
     }
 
     fun skipToNext() {

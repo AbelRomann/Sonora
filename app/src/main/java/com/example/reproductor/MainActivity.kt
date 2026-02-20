@@ -7,7 +7,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,7 +44,7 @@ import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
 import com.example.reproductor.presentation.navigation.Screen
 import com.example.reproductor.ui.theme.ReproductorTheme
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -87,10 +86,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun MusicPlayerApp() {
-    val navController = rememberAnimatedNavController()
+    val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val showPlayer = currentRoute == Screen.Player.route
 
