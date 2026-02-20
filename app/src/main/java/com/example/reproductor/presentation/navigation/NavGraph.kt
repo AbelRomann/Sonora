@@ -1,10 +1,5 @@
 package com.example.reproductor.presentation.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -15,14 +10,16 @@ import com.example.reproductor.presentation.screens.library.LibraryScreen
 import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
+import com.example.reproductor.presentation.screens.showcase.ShowcaseScreen
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Library : Screen("library")
     object Player : Screen("player")
     object Search : Screen("search")
+    object Showcase : Screen("showcase")
     object Album : Screen("album/{albumId}") {
         fun createRoute(albumId: Long) = "album/$albumId"
     }
@@ -31,45 +28,16 @@ sealed class Screen(val route: String) {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun NavGraph(
     navController: NavHostController,
     onNavigateToPlayer: () -> Unit
 ) {
-    AnimatedNavHost(
+    NavHost(
         navController = navController,
-        startDestination = Screen.Home.route,
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(220)
-            )
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(220)
-            )
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(220)
-            )
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(220)
-            )
-        }
+        startDestination = Screen.Home.route
     ) {
-        composable(
-            route = Screen.Home.route,
-            enterTransition = { fadeIn(animationSpec = tween(220)) },
-            exitTransition = { fadeOut(animationSpec = tween(220)) }
-        ) {
+        composable(route = Screen.Home.route) {
             HomeScreen(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
@@ -99,21 +67,7 @@ fun NavGraph(
             )
         }
 
-        composable(
-            route = Screen.Player.route,
-            enterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(260)
-                )
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(260)
-                )
-            }
-        ) {
+        composable(route = Screen.Player.route) {
             PlayerScreen(
                 onBackClick = { navController.popBackStack() }
             )
@@ -124,6 +78,10 @@ fun NavGraph(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.Showcase.route) {
+            ShowcaseScreen()
         }
 
         composable(
