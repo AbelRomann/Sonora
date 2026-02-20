@@ -1,13 +1,14 @@
 package com.example.reproductor.presentation.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.reproductor.presentation.screens.album.AlbumScreen
 import com.example.reproductor.presentation.screens.home.HomeScreen
@@ -15,8 +16,6 @@ import com.example.reproductor.presentation.screens.library.LibraryScreen
 import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -31,13 +30,12 @@ sealed class Screen(val route: String) {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun NavGraph(
     navController: NavHostController,
     onNavigateToPlayer: () -> Unit
 ) {
-    AnimatedNavHost(
+    NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
         enterTransition = {

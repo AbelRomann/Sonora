@@ -178,20 +178,25 @@ fun LibraryScreen(
                 SongsTab(
                     songs = songs,
                     selectedSongIds = selectedSongIds.toSet(),
-                    onSongClick = { song ->
-                        if (selectionMode) {
-                            toggleSongSelection(song.id)
-                        } else {
-                            val index = songs.indexOf(song)
-                            viewModel.playSongs(songs, index)
-                            onNavigateToPlayer()
+                    selectionMode = selectionMode,
+                    onSongClick = remember(songs, selectionMode, viewModel, onNavigateToPlayer) {
+                        { song: Song ->
+                            if (selectionMode) {
+                                toggleSongSelection(song.id)
+                            } else {
+                                val index = songs.indexOf(song)
+                                viewModel.playSongs(songs, index)
+                                onNavigateToPlayer()
+                            }
                         }
                     },
-                    onSongLongClick = { song ->
-                        if (!selectionMode) {
-                            selectionMode = true
+                    onSongLongClick = remember(viewModel) {
+                        { song: Song ->
+                            if (!selectionMode) {
+                                selectionMode = true
+                            }
+                            toggleSongSelection(song.id)
                         }
-                        toggleSongSelection(song.id)
                     },
                     lightListModeEnabled = lightListModeEnabled
                 )
@@ -241,10 +246,13 @@ fun LibraryScreen(
 private fun SongsTab(
     songs: List<Song>,
     selectedSongIds: Set<Long>,
+    selectionMode: Boolean,
     onSongClick: (Song) -> Unit,
     onSongLongClick: (Song) -> Unit,
     lightListModeEnabled: Boolean
 ) {
+    // Índice O(1) para encontrar la posición de la canción al hacer click
+    val songIndexMap = remember(songs) { songs.withIndex().associate { (i, s) -> s.id to i } }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Card(

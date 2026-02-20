@@ -2,6 +2,7 @@ package com.example.reproductor.presentation.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
 import com.example.reproductor.domain.model.PlaybackMode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +16,7 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
 
     val playerState: StateFlow<PlayerState> = playerController.playerState
+    val playbackProgress: StateFlow<PlaybackProgress> = playerController.playbackProgress
     val playbackMode: StateFlow<PlaybackMode> = playerController.playbackMode
 
     fun togglePlayPause() {
