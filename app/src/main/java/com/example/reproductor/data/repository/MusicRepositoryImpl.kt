@@ -16,6 +16,8 @@ import com.example.reproductor.domain.model.Playlist
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.domain.repository.MusicRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -81,8 +83,12 @@ class MusicRepositoryImpl @Inject constructor(
         val shouldScan = (now - lastScan > CACHE_VALIDITY_MS) || !hasSongs
 
         if (shouldScan) {
-            val songs = mediaStoreDataSource.scanMusic()
-            val albums = mediaStoreDataSource.scanAlbums()
+            // Escaneo paralelo: canciones y álbumes se obtienen al mismo tiempo
+            val (songs, albums) = coroutineScope {
+                val songsDeferred = async { mediaStoreDataSource.scanMusic() }
+                val albumsDeferred = async { mediaStoreDataSource.scanAlbums() }
+                songsDeferred.await() to albumsDeferred.await()
+            }
 
             database.withTransaction {
                 syncSongsIncrementally(songs)
@@ -94,8 +100,12 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun forceRefreshMusic() = withContext(Dispatchers.IO) {
-        val songs = mediaStoreDataSource.scanMusic()
-        val albums = mediaStoreDataSource.scanAlbums()
+        // Escaneo paralelo también en la actualización forzada
+        val (songs, albums) = coroutineScope {
+            val songsDeferred = async { mediaStoreDataSource.scanMusic() }
+            val albumsDeferred = async { mediaStoreDataSource.scanAlbums() }
+            songsDeferred.await() to albumsDeferred.await()
+        }
 
         database.withTransaction {
             syncSongsIncrementally(songs)
