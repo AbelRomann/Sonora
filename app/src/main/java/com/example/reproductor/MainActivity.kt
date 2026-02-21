@@ -19,8 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -124,10 +124,16 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
             label = { Text("Biblioteca") }
         )
         NavigationBarItem(
-            selected = currentRoute == Screen.Search.route,
-            onClick = { navController.navigateSingleTopTo(Screen.Search.route) },
-            icon = { Icon(Icons.Default.Search, contentDescription = null) },
-            label = { Text("Buscar") }
+            selected = currentRoute == Screen.Playlists.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Playlists.route) },
+            icon = { Icon(Icons.Default.GridView, contentDescription = null) },
+            label = { Text("Playlists") }
+        )
+        NavigationBarItem(
+            selected = currentRoute == Screen.Artists.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Artists.route) },
+            icon = { Icon(Icons.Default.People, contentDescription = null) },
+            label = { Text("Artistas") }
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Showcase.route,

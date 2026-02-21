@@ -7,18 +7,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.reproductor.presentation.screens.album.AlbumScreen
+import com.example.reproductor.presentation.screens.artists.ArtistsScreen
 import com.example.reproductor.presentation.screens.home.HomeScreen
 import com.example.reproductor.presentation.screens.library.LibraryScreen
 import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
+import com.example.reproductor.presentation.screens.playlists.PlaylistsScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
-import com.example.reproductor.presentation.screens.showcase.ShowcaseScreen
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Library : Screen("library")
+    object Playlists : Screen("playlists")
+    object Artists : Screen("artists")
     object Player : Screen("player")
     object Search : Screen("search")
     object Showcase : Screen("showcase")
@@ -47,13 +48,15 @@ fun NavGraph(
         }
 
         composable(Screen.Library.route) {
-            LibraryScreen(
-                onNavigateToPlayer = onNavigateToPlayer,
-                onBackClick = { navController.popBackStack() },
-                onOpenPlaylist = { playlistId ->
-                    navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
-                }
-            )
+            LibraryScreen(onNavigateToPlayer = onNavigateToPlayer)
+        }
+
+        composable(Screen.Playlists.route) {
+            PlaylistsScreen()
+        }
+
+        composable(Screen.Artists.route) {
+            ArtistsScreen()
         }
 
         composable(
