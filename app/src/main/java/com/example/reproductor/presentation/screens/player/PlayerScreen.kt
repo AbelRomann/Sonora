@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.RowScope.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,20 +50,20 @@ import coil.compose.AsyncImage
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.player.PlayerViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(onBackClick: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
     // playerState: solo cambia al cambiar de canción (título, artwork, play/pause)
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
+    val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong
 
     var isUserSeeking by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(playerState.currentPosition, playerState.duration, isUserSeeking) {
+    LaunchedEffect(playbackProgress.currentPosition, playbackProgress.duration, isUserSeeking) {
         if (!isUserSeeking) {
-            sliderPosition = if (playerState.duration > 0) {
-                (playerState.currentPosition.toFloat() / playerState.duration.toFloat()).coerceIn(0f, 1f)
+            sliderPosition = if (playbackProgress.duration > 0) {
+                (playbackProgress.currentPosition.toFloat() / playbackProgress.duration.toFloat()).coerceIn(0f, 1f)
             } else 0f
         }
     }
@@ -120,15 +119,15 @@ fun PlayerScreen(onBackClick: () -> Unit, viewModel: PlayerViewModel = hiltViewM
             value = sliderPosition,
             onValueChange = { isUserSeeking = true; sliderPosition = it },
             onValueChangeFinished = {
-                viewModel.seekTo((sliderPosition * playerState.duration).toLong())
+                viewModel.seekTo((sliderPosition * playbackProgress.duration).toLong())
                 isUserSeeking = false
             },
             modifier = Modifier.fillMaxWidth()
         )
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatDuration(playerState.currentPosition), color = Color(0xFF3A3A50))
-            Text(formatDuration(playerState.duration), color = Color(0xFF3A3A50))
+            Text(formatDuration(playbackProgress.currentPosition), color = Color(0xFF3A3A50))
+            Text(formatDuration(playbackProgress.duration), color = Color(0xFF3A3A50))
         }
 
         Spacer(Modifier.height(12.dp))
