@@ -14,6 +14,7 @@ import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.playlists.PlaylistsScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
+import com.example.reproductor.presentation.screens.showcase.ShowcaseScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
