@@ -22,6 +22,7 @@ sealed class Screen(val route: String) {
     object Artists : Screen("artists")
     object Player : Screen("player")
     object Search : Screen("search")
+    object Showcase : Screen("showcase")
     object Album : Screen("album/{albumId}") {
         fun createRoute(albumId: Long) = "album/$albumId"
     }
@@ -82,6 +83,10 @@ fun NavGraph(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.Showcase.route) {
+            ShowcaseScreen()
         }
 
         composable(

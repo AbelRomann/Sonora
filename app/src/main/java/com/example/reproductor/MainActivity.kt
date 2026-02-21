@@ -135,6 +135,12 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
             icon = { Icon(Icons.Default.People, contentDescription = null) },
             label = { Text("Artistas") }
         )
+        NavigationBarItem(
+            selected = currentRoute == Screen.Showcase.route,
+            onClick = { navController.navigateSingleTopTo(Screen.Showcase.route) },
+            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+            label = { Text("Soundwave") }
+        )
     }
 }
 

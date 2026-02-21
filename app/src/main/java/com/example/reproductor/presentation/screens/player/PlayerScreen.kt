@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.reproductor.presentation.screens.player
 
 import androidx.compose.foundation.background
@@ -29,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,8 +51,10 @@ import coil.compose.AsyncImage
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.player.PlayerViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(onBackClick: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
+    // playerState: solo cambia al cambiar de canción (título, artwork, play/pause)
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong
 
@@ -136,5 +139,40 @@ fun PlayerScreen(onBackClick: () -> Unit, viewModel: PlayerViewModel = hiltViewM
             }
             IconButton(onClick = { viewModel.skipToNext() }) { Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color(0xFF6B6B85), modifier = Modifier.size(36.dp)) }
         }
+    }
+}
+
+/**
+ * Composable aislado para el slider de progreso.
+ * Al ser un componente separado, solo él se recompone cada vez que avanza la posición,
+ * dejando intactos el artwork, el título y los botones de control.
+ */
+@Composable
+private fun PlaybackSlider(
+    progress: Long,
+    duration: Long,
+    onSeek: (Long) -> Unit
+) {
+    var isUserSeeking by remember { mutableStateOf(false) }
+    var sliderPosition by remember { mutableFloatStateOf(0f) }
+
+    if (!isUserSeeking) {
+        sliderPosition = if (duration > 0) {
+            (progress.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        } else 0f
+    }
+
+    Slider(
+        value = sliderPosition,
+        onValueChange = { isUserSeeking = true; sliderPosition = it },
+        onValueChangeFinished = {
+            onSeek((sliderPosition * duration).toLong())
+            isUserSeeking = false
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(formatDuration(progress), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(formatDuration(duration), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

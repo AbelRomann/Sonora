@@ -44,6 +44,7 @@ import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.presentation.library.LibraryViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
