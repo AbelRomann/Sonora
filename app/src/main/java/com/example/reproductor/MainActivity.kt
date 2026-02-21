@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -135,12 +134,6 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
             onClick = { navController.navigateSingleTopTo(Screen.Artists.route) },
             icon = { Icon(Icons.Default.People, contentDescription = null) },
             label = { Text("Artistas") }
-        )
-        NavigationBarItem(
-            selected = currentRoute == Screen.Showcase.route,
-            onClick = { navController.navigateSingleTopTo(Screen.Showcase.route) },
-            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-            label = { Text("Soundwave") }
         )
     }
 }
