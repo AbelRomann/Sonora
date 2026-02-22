@@ -12,15 +12,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,26 +38,46 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.library.LibraryViewModel
+import com.example.reproductor.presentation.player.PlayerViewModel
+import com.example.reproductor.ui.theme.AccentLime
+import com.example.reproductor.ui.theme.CardGradientEnd
+import com.example.reproductor.ui.theme.CardGradientStart
+import com.example.reproductor.ui.theme.CoverGradientEnd
+import com.example.reproductor.ui.theme.CoverGradientStart
+import com.example.reproductor.ui.theme.PlayerBackground
+import com.example.reproductor.ui.theme.RecentCardBg
+import com.example.reproductor.ui.theme.TextMuted
+import com.example.reproductor.ui.theme.TextSubtle
 
 @Composable
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
     onNavigateToLibrary: () -> Unit,
-    viewModel: LibraryViewModel = hiltViewModel()
+    viewModel: LibraryViewModel = hiltViewModel(),
+    playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val playerState by playerViewModel.playerState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.refreshMusicOnFirstSessionEntry() }
+
+    val currentSong = playerState.currentSong
+    val featured = currentSong ?: songs.firstOrNull()
+    val isPlaying = playerState.isPlaying
 
     val onSongClick = remember(viewModel, onNavigateToPlayer) {
         { song: Song ->
@@ -60,107 +86,299 @@ fun HomeScreen(
         }
     }
 
-    val featured = songs.firstOrNull()
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF060609))
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .background(PlayerBackground)
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        // ── Block 1: Header ──
         item {
-            Spacer(Modifier.height(12.dp))
-            Text("BUENOS DÍAS", color = Color(0xFF6B6B85), style = MaterialTheme.typography.labelSmall)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Reproduciendo",
-                    color = Color(0xFFF0F0F8),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { viewModel.refreshMusic() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Actualizar", tint = Color(0xFFE8FF47))
-                }
-            }
+            Spacer(Modifier.height(48.dp))
+            Text(
+                text = "BUENOS DÍAS",
+                color = TextMuted,
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Reproduciendo",
+                color = Color(0xFFF0F0F8),
+                style = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp),
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(Modifier.height(20.dp))
+        }
 
+        // ── Block 2: Now Playing Card ──
+        item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { if (featured != null) onSongClick(featured) },
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
                 Column(
                     modifier = Modifier
-                        .background(Brush.linearGradient(listOf(Color(0xFF1E0A30), Color(0xFF0A1535))))
-                        .padding(16.dp)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(CardGradientStart, CardGradientEnd)
+                            )
+                        )
+                        .padding(20.dp)
                 ) {
+                    // Album art
                     Box(
                         modifier = Modifier
                             .size(90.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFFFF5F7E))))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(CoverGradientStart, CoverGradientEnd)
+                                )
+                            )
                     ) {
                         if (featured?.albumArt != null) {
-                            AsyncImage(model = featured?.albumArt, contentDescription = null, modifier = Modifier.fillMaxSize())
+                            AsyncImage(
+                                model = featured.albumArt,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Text("EN REPRODUCCIÓN", color = Color(0xFF7B61FF), style = MaterialTheme.typography.labelSmall)
-                    Text(featured?.title ?: "Sin canciones", color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(featured?.artist ?: "Escanea tu biblioteca", color = Color(0xFFB0B0C0), style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = Color(0xFF6B6B85))
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Status label
+                    Text(
+                        text = "EN REPRODUCCIÓN",
+                        color = CoverGradientStart,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                    // Song title
+                    Text(
+                        text = featured?.title ?: "Sin canciones",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Artist · Album
+                    Text(
+                        text = if (featured != null) {
+                            "${featured.artist} · ${featured.album}"
+                        } else {
+                            "Escanea tu biblioteca"
+                        },
+                        color = TextSubtle,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Subtle divider
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(0.5.dp)
+                            .background(TextMuted.copy(alpha = 0.25f))
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Playback controls
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Repeat
+                        IconButton(
+                            onClick = { playerViewModel.togglePlaybackMode() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Repeat,
+                                contentDescription = "Repetir",
+                                tint = TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Previous
+                        IconButton(
+                            onClick = { playerViewModel.skipToPrevious() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.SkipPrevious,
+                                contentDescription = "Anterior",
+                                tint = TextMuted,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Play / Pause — Dominant visual center
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(23.dp))
-                                .background(Color(0xFFE8FF47)),
+                                .size(56.dp)
+                                .shadow(
+                                    elevation = 12.dp,
+                                    shape = CircleShape,
+                                    ambientColor = AccentLime.copy(alpha = 0.4f),
+                                    spotColor = AccentLime.copy(alpha = 0.4f)
+                                )
+                                .clip(CircleShape)
+                                .background(AccentLime)
+                                .clickable { playerViewModel.togglePlayPause() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black)
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                                tint = Color.Black,
+                                modifier = Modifier.size(30.dp)
+                            )
                         }
-                        Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color(0xFF6B6B85))
+
+                        // Next
+                        IconButton(
+                            onClick = { playerViewModel.skipToNext() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.SkipNext,
+                                contentDescription = "Siguiente",
+                                tint = TextMuted,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Shuffle
+                        IconButton(
+                            onClick = { playerViewModel.togglePlaybackMode() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Shuffle,
+                                contentDescription = "Aleatorio",
+                                tint = TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Recientes", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // ── Block 3: Recents Header ──
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "ver todo →",
-                    color = Color(0xFFE8FF47),
+                    text = "Recientes",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "ver todo →",
+                    color = AccentLime,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.clickable(onClick = onNavigateToLibrary)
                 )
             }
+            Spacer(Modifier.height(8.dp))
         }
 
-        items(songs.take(8), key = { it.id }) { song ->
+        // ── Recents List ──
+        items(songs.take(5), key = { it.id }) { song ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF171722))
+                    .background(RecentCardBg)
                     .clickable { onSongClick(song) }
-                    .padding(10.dp),
+                    .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Thumbnail
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFFE8FF47), Color(0xFF7B61FF))))
-                )
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    Text(song.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(song.artist, color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    CoverGradientStart.copy(alpha = 0.7f),
+                                    CoverGradientEnd.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                ) {
+                    if (!song.albumArt.isNullOrBlank()) {
+                        AsyncImage(
+                            model = song.albumArt,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
+
+                Spacer(Modifier.width(12.dp))
+
+                // Title + Artist
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = song.artist,
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Duration
+                Text(
+                    text = formatDuration(song.duration),
+                    color = TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+
+                // More button
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = null,
+                    tint = TextMuted.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
 
-        item { Spacer(Modifier.height(90.dp)) }
+        // Bottom spacer for navigation
+        item { Spacer(Modifier.height(100.dp)) }
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,12 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.reproductor.presentation.components.MiniPlayer
 import com.example.reproductor.presentation.navigation.NavGraph
 import com.example.reproductor.presentation.navigation.Screen
+import com.example.reproductor.ui.theme.AccentLime
+import com.example.reproductor.ui.theme.NavInactive
+import com.example.reproductor.ui.theme.PlayerBackground
 import com.example.reproductor.ui.theme.ReproductorTheme
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -110,30 +115,98 @@ fun MusicPlayerApp() {
 
 @Composable
 private fun BottomNavigationBar(currentRoute: String?, navController: NavHostController) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = PlayerBackground,
+        contentColor = NavInactive,
+        tonalElevation = 0.dp
+    ) {
         NavigationBarItem(
             selected = currentRoute == Screen.Home.route,
             onClick = { navController.navigateSingleTopTo(Screen.Home.route) },
-            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-            label = { Text("Inicio") }
+            icon = {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (currentRoute == Screen.Home.route) AccentLime else NavInactive
+                )
+            },
+            label = {
+                Text(
+                    "Inicio",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                    color = if (currentRoute == Screen.Home.route) AccentLime else NavInactive
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = AccentLime.copy(alpha = 0.1f)
+            )
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Library.route,
             onClick = { navController.navigateSingleTopTo(Screen.Library.route) },
-            icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
-            label = { Text("Biblioteca") }
+            icon = {
+                Icon(
+                    Icons.Default.LibraryMusic,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (currentRoute == Screen.Library.route) AccentLime else NavInactive
+                )
+            },
+            label = {
+                Text(
+                    "Biblioteca",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                    color = if (currentRoute == Screen.Library.route) AccentLime else NavInactive
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = AccentLime.copy(alpha = 0.1f)
+            )
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Playlists.route,
             onClick = { navController.navigateSingleTopTo(Screen.Playlists.route) },
-            icon = { Icon(Icons.Default.GridView, contentDescription = null) },
-            label = { Text("Playlists") }
+            icon = {
+                Icon(
+                    Icons.Default.GridView,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (currentRoute == Screen.Playlists.route) AccentLime else NavInactive
+                )
+            },
+            label = {
+                Text(
+                    "Playlists",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                    color = if (currentRoute == Screen.Playlists.route) AccentLime else NavInactive
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = AccentLime.copy(alpha = 0.1f)
+            )
         )
         NavigationBarItem(
             selected = currentRoute == Screen.Artists.route,
             onClick = { navController.navigateSingleTopTo(Screen.Artists.route) },
-            icon = { Icon(Icons.Default.People, contentDescription = null) },
-            label = { Text("Artistas") }
+            icon = {
+                Icon(
+                    Icons.Default.People,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (currentRoute == Screen.Artists.route) AccentLime else NavInactive
+                )
+            },
+            label = {
+                Text(
+                    "Artistas",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                    color = if (currentRoute == Screen.Artists.route) AccentLime else NavInactive
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = AccentLime.copy(alpha = 0.1f)
+            )
         )
     }
 }
