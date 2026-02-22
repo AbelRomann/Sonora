@@ -17,12 +17,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
+
+enum class LibraryFilter { TODAS, RECIENTES, FAVORITAS }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -50,6 +53,25 @@ class LibraryViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val favoriteSongs = musicRepository.getFavoriteSongs()
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _selectedFilter = MutableStateFlow(LibraryFilter.TODAS)
+    val selectedFilter: StateFlow<LibraryFilter> = _selectedFilter.asStateFlow()
+
+    val filteredSongs: StateFlow<List<Song>> = combine(
+        songs,
+        favoriteSongs,
+        _selectedFilter
+    ) { allSongs, favorites, filter ->
+        when (filter) {
+            LibraryFilter.TODAS -> allSongs
+            LibraryFilter.RECIENTES -> allSongs.take(30)
+            LibraryFilter.FAVORITAS -> favorites
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val albums: StateFlow<List<Album>> = getAlbumsUseCase()
         .onEach { albumList ->
             if (_isLoading.value && albumList.isNotEmpty()) {
@@ -72,11 +94,22 @@ class LibraryViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-
     private val _lightListModeEnabled = MutableStateFlow(true)
     val lightListModeEnabled: StateFlow<Boolean> = _lightListModeEnabled.asStateFlow()
 
+    fun setFilter(filter: LibraryFilter) {
+        _selectedFilter.value = filter
+    }
+
+    fun toggleFavorite(songId: Long) {
+        viewModelScope.launch {
+            musicRepository.toggleFavorite(songId)
+        }
+    }
+
     fun getSongsForPlaylist(playlistId: Long) = musicRepository.getSongsInPlaylist(playlistId)
+
+    fun getSongsByArtistName(artistName: String) = musicRepository.getSongsByArtistName(artistName)
 
     fun refreshMusicOnFirstSessionEntry() {
         if (initialRefreshTriggeredInSession) return
@@ -156,7 +189,6 @@ class LibraryViewModel @Inject constructor(
             }
         }
     }
-
 
     fun setLightListMode(enabled: Boolean) {
         _lightListModeEnabled.value = enabled

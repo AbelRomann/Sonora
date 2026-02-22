@@ -12,5 +12,6 @@ data class Song(
     val path: String,
     val albumId: Long,
     val artistId: Long,
-    val albumArt: String?
+    val albumArt: String?,
+    val isFavorite: Boolean = false
 )

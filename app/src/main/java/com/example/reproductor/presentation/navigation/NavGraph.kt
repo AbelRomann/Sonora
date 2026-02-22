@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.reproductor.presentation.screens.album.AlbumScreen
+import com.example.reproductor.presentation.screens.artists.ArtistDetailScreen
 import com.example.reproductor.presentation.screens.artists.ArtistsScreen
 import com.example.reproductor.presentation.screens.home.HomeScreen
 import com.example.reproductor.presentation.screens.library.LibraryScreen
@@ -14,6 +15,8 @@ import com.example.reproductor.presentation.screens.library.PlaylistDetailScreen
 import com.example.reproductor.presentation.screens.player.PlayerScreen
 import com.example.reproductor.presentation.screens.playlists.PlaylistsScreen
 import com.example.reproductor.presentation.screens.search.SearchScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -27,6 +30,12 @@ sealed class Screen(val route: String) {
     }
     object PlaylistDetail : Screen("playlist/{playlistId}") {
         fun createRoute(playlistId: Long) = "playlist/$playlistId"
+    }
+    object ArtistDetail : Screen("artist_detail/{artistName}") {
+        fun createRoute(artistName: String): String {
+            val encoded = URLEncoder.encode(artistName, "UTF-8")
+            return "artist_detail/$encoded"
+        }
     }
 }
 
@@ -47,15 +56,26 @@ fun NavGraph(
         }
 
         composable(Screen.Library.route) {
-            LibraryScreen(onNavigateToPlayer = onNavigateToPlayer)
+            LibraryScreen(
+                onNavigateToPlayer = onNavigateToPlayer,
+                onNavigateToSearch = { navController.navigate(Screen.Search.route) }
+            )
         }
 
         composable(Screen.Playlists.route) {
-            PlaylistsScreen()
+            PlaylistsScreen(
+                onNavigateToPlaylistDetail = { playlistId ->
+                    navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
+                }
+            )
         }
 
         composable(Screen.Artists.route) {
-            ArtistsScreen()
+            ArtistsScreen(
+                onNavigateToArtistDetail = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                }
+            )
         }
 
         composable(
@@ -66,6 +86,21 @@ fun NavGraph(
         ) {
             PlaylistDetailScreen(
                 playlistId = it.arguments?.getLong("playlistId") ?: 0L,
+                onNavigateToPlayer = onNavigateToPlayer,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.ArtistDetail.route,
+            arguments = listOf(
+                navArgument("artistName") { type = NavType.StringType }
+            )
+        ) {
+            val encodedName = it.arguments?.getString("artistName") ?: ""
+            val artistName = URLDecoder.decode(encodedName, "UTF-8")
+            ArtistDetailScreen(
+                artistName = artistName,
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
             )
@@ -83,7 +118,6 @@ fun NavGraph(
                 onBackClick = { navController.popBackStack() }
             )
         }
-
 
         composable(
             route = Screen.Album.route,

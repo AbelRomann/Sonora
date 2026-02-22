@@ -1,6 +1,7 @@
 package com.example.reproductor.presentation.screens.artists
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +33,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.reproductor.presentation.library.LibraryViewModel
 
 @Composable
-fun ArtistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
+fun ArtistsScreen(
+    onNavigateToArtistDetail: (String) -> Unit,
+    viewModel: LibraryViewModel = hiltViewModel()
+) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val grouped = songs.groupBy { it.artist }.toList().sortedByDescending { it.second.size }
 
@@ -53,6 +57,7 @@ fun ArtistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
                         .background(Brush.linearGradient(listOf(Color(0xFF1A0A10), Color(0xFF1A1A0A))))
+                        .clickable { onNavigateToArtistDetail(top.first) }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -75,7 +80,14 @@ fun ArtistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
         }
 
         items(grouped.take(20)) { (artist, list) ->
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onNavigateToArtistDetail(artist) }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)

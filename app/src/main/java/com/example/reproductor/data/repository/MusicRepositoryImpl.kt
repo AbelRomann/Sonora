@@ -65,10 +65,28 @@ class MusicRepositoryImpl @Inject constructor(
             .flowOn(Dispatchers.IO)
     }
 
+    override fun getSongsByArtistName(artistName: String): Flow<List<Song>> {
+        return songDao.getSongsByArtistName(artistName)
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
+    }
+
     override fun searchSongs(query: String): Flow<List<Song>> {
         return songDao.searchSongs(query)
             .map { entities -> entities.map { it.toDomain() } }
             .flowOn(Dispatchers.IO)
+    }
+
+    override fun getFavoriteSongs(): Flow<List<Song>> {
+        return songDao.getFavoriteSongs()
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
+    }
+
+    override suspend fun toggleFavorite(songId: Long) {
+        withContext(Dispatchers.IO) {
+            songDao.toggleFavorite(songId)
+        }
     }
 
     override suspend fun refreshMusic() = withContext(Dispatchers.IO) {

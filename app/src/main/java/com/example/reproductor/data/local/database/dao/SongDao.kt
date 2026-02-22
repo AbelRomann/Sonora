@@ -18,6 +18,9 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE artistId = :artistId ORDER BY dateAdded DESC, id DESC")
     fun getSongsByArtist(artistId: Long): Flow<List<SongEntity>>
 
+    @Query("SELECT * FROM songs WHERE artist = :artistName ORDER BY title ASC")
+    fun getSongsByArtistName(artistName: String): Flow<List<SongEntity>>
+
     @Query("SELECT * FROM songs")
     suspend fun getSongsSnapshot(): List<SongEntity>
 
@@ -35,4 +38,10 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY dateAdded DESC, id DESC")
     fun searchSongs(query: String): Flow<List<SongEntity>>
+
+    @Query("UPDATE songs SET isFavorite = NOT isFavorite WHERE id = :songId")
+    suspend fun toggleFavorite(songId: Long)
+
+    @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY dateAdded DESC, id DESC")
+    fun getFavoriteSongs(): Flow<List<SongEntity>>
 }

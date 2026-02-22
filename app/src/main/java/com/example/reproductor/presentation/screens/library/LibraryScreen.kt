@@ -16,9 +16,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,14 +35,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.reproductor.presentation.library.LibraryFilter
 import com.example.reproductor.presentation.library.LibraryViewModel
 
 @Composable
 fun LibraryScreen(
     onNavigateToPlayer: () -> Unit,
+    onNavigateToSearch: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
-    val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val filteredSongs by viewModel.filteredSongs.collectAsStateWithLifecycle()
+    val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier
@@ -57,6 +62,7 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFF171722))
+                    .clickable { onNavigateToSearch() }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -65,19 +71,19 @@ fun LibraryScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 10.dp)) {
-                FilterChipLike("Todas", selected = true)
-                FilterChipLike("Recientes")
-                FilterChipLike("Favoritas")
+                FilterChipLike("Todas", selected = selectedFilter == LibraryFilter.TODAS, onClick = { viewModel.setFilter(LibraryFilter.TODAS) })
+                FilterChipLike("Recientes", selected = selectedFilter == LibraryFilter.RECIENTES, onClick = { viewModel.setFilter(LibraryFilter.RECIENTES) })
+                FilterChipLike("Favoritas", selected = selectedFilter == LibraryFilter.FAVORITAS, onClick = { viewModel.setFilter(LibraryFilter.FAVORITAS) })
             }
-            Text("${songs.size} canciones", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            Text("${filteredSongs.size} canciones", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         }
 
-        itemsIndexed(songs.take(30), key = { _, s -> s.id }) { index, song ->
+        itemsIndexed(filteredSongs.take(50), key = { _, s -> s.id }) { index, song ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        viewModel.playSongs(songs, index)
+                        viewModel.playSongs(filteredSongs, index)
                         onNavigateToPlayer()
                     }
                     .padding(vertical = 8.dp),
@@ -94,7 +100,13 @@ fun LibraryScreen(
                     Text(song.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text(song.artist, color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = Color(0xFF3A3A50))
+                IconButton(onClick = { viewModel.toggleFavorite(song.id) }) {
+                    Icon(
+                        if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (song.isFavorite) "Quitar de favoritas" else "Agregar a favoritas",
+                        tint = if (song.isFavorite) Color(0xFFFF5F7E) else Color(0xFF3A3A50)
+                    )
+                }
             }
         }
 
@@ -103,11 +115,12 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun FilterChipLike(label: String, selected: Boolean = false) {
+private fun FilterChipLike(label: String, selected: Boolean = false, onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(if (selected) Color(0xFFE8FF47) else Color(0xFF171722))
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(

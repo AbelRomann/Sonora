@@ -10,7 +10,10 @@ interface MusicRepository {
     fun getAllAlbums(): Flow<List<Album>>
     fun getSongsByAlbum(albumId: Long): Flow<List<Song>>
     fun getSongsByArtist(artistId: Long): Flow<List<Song>>
+    fun getSongsByArtistName(artistName: String): Flow<List<Song>>
     fun searchSongs(query: String): Flow<List<Song>>
+    fun getFavoriteSongs(): Flow<List<Song>>
+    suspend fun toggleFavorite(songId: Long)
     suspend fun refreshMusic()
     suspend fun forceRefreshMusic()
 

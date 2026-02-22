@@ -37,7 +37,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.reproductor.presentation.library.LibraryViewModel
 
 @Composable
-fun PlaylistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
+fun PlaylistsScreen(
+    onNavigateToPlaylistDetail: (Long) -> Unit,
+    viewModel: LibraryViewModel = hiltViewModel()
+) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     Column(
@@ -99,7 +102,7 @@ fun PlaylistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF171722))
-                        .clickable { }
+                        .clickable { onNavigateToPlaylistDetail(playlist.id) }
                 ) {
                     Box(
                         modifier = Modifier
@@ -109,7 +112,7 @@ fun PlaylistsScreen(viewModel: LibraryViewModel = hiltViewModel()) {
                     )
                     Column(Modifier.padding(10.dp)) {
                         Text(playlist.name, color = Color.White, maxLines = 1)
-                        Text("playlist", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall)
+                        Text("${playlist.songCount} canciones", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
