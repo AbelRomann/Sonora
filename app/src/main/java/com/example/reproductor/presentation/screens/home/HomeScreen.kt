@@ -1,7 +1,9 @@
 package com.example.reproductor.presentation.screens.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.library.LibraryViewModel
 import com.example.reproductor.presentation.player.PlayerViewModel
@@ -63,6 +68,7 @@ import com.example.reproductor.ui.theme.RecentCardBg
 import com.example.reproductor.ui.theme.TextMuted
 import com.example.reproductor.ui.theme.TextSubtle
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
@@ -72,12 +78,15 @@ fun HomeScreen(
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val playerState by playerViewModel.playerState.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.refreshMusicOnFirstSessionEntry() }
 
     val currentSong = playerState.currentSong
     val featured = currentSong ?: songs.firstOrNull()
     val isPlaying = playerState.isPlaying
+
+    var selectedSong by remember { mutableStateOf<Song?>(null) }
 
     val onSongClick = remember(viewModel, onNavigateToPlayer) {
         { song: Song ->
@@ -312,7 +321,10 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(RecentCardBg)
-                    .clickable { onSongClick(song) }
+                    .combinedClickable(
+                        onClick = { onSongClick(song) },
+                        onLongClick = { selectedSong = song }
+                    )
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -369,16 +381,53 @@ fun HomeScreen(
                 )
 
                 // More button
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = null,
-                    tint = TextMuted.copy(alpha = 0.6f),
-                    modifier = Modifier.size(18.dp)
-                )
+                IconButton(
+                    onClick = { selectedSong = song },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Opciones",
+                        tint = TextMuted.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
         // Bottom spacer for navigation
         item { Spacer(Modifier.height(100.dp)) }
+    }
+
+    // ── Song Options Sheet ────────────────────────────────────────────────────
+    selectedSong?.let { song ->
+        val songIndex = songs.indexOf(song).coerceAtLeast(0)
+        // Use a repeating 6-color gradient palette
+        val gradientPalette = listOf(
+            listOf(Color(0xFF7B61FF), Color(0xFFFF5F7E)),
+            listOf(Color(0xFF4FD5FF), Color(0xFF1A6AFF)),
+            listOf(Color(0xFF00C896), Color(0xFF4FD5FF)),
+            listOf(Color(0xFFFFCC4F), Color(0xFFFF6B4A)),
+            listOf(Color(0xFFFF73C2), Color(0xFF9C7BFF)),
+            listOf(Color(0xFF4FA0FF), Color(0xFF00C896)),
+        )
+        SongOptionsSheet(
+            song = song,
+            playlists = playlists,
+            coverGradient = gradientPalette[songIndex % gradientPalette.size],
+            onDismiss = { selectedSong = null },
+            onPlayNext = {
+                viewModel.playNext(song)
+                selectedSong = null
+            },
+            onAddToQueue = {
+                viewModel.addToQueue(song)
+                selectedSong = null
+            },
+            onAddToPlaylist = { playlistId ->
+                viewModel.addSongToPlaylist(playlistId, song.id)
+                selectedSong = null
+            }
+        )
     }
 }

@@ -1,7 +1,9 @@
 package com.example.reproductor.presentation.screens.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +26,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,9 +39,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.reproductor.domain.model.Song
+import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.library.LibraryFilter
 import com.example.reproductor.presentation.library.LibraryViewModel
 
+// Gradient palette for song covers (mirrors PlaylistDetailScreen)
+private val libraryCoverBrushes = listOf(
+    listOf(Color(0xFF7B61FF), Color(0xFFFF5F7E)),
+    listOf(Color(0xFF4FD5FF), Color(0xFF1A6AFF)),
+    listOf(Color(0xFF00C896), Color(0xFF4FD5FF)),
+    listOf(Color(0xFFFFCC4F), Color(0xFFFF6B4A)),
+    listOf(Color(0xFFFF73C2), Color(0xFF9C7BFF)),
+    listOf(Color(0xFF4FA0FF), Color(0xFF00C896)),
+)
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(
     onNavigateToPlayer: () -> Unit,
@@ -46,6 +63,9 @@ fun LibraryScreen(
 ) {
     val filteredSongs by viewModel.filteredSongs.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+
+    var selectedSong by remember { mutableStateOf<Song?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -82,35 +102,72 @@ fun LibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        viewModel.playSongs(filteredSongs, index)
-                        onNavigateToPlayer()
-                    }
+                    .combinedClickable(
+                        onClick = {
+                            viewModel.playSongs(filteredSongs, index)
+                            onNavigateToPlayer()
+                        },
+                        onLongClick = { selectedSong = song }
+                    )
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("${index + 1}", color = Color(0xFF3A3A50), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
+                Text(
+                    "${index + 1}",
+                    color = Color(0xFF3A3A50),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
                 Box(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFFE8FF47))))
+                        .background(Brush.linearGradient(libraryCoverBrushes[index % libraryCoverBrushes.size]))
                 )
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(song.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text(song.artist, color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                IconButton(onClick = { viewModel.toggleFavorite(song.id) }) {
+                // More options button
+                IconButton(
+                    onClick = { selectedSong = song },
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (song.isFavorite) "Quitar de favoritas" else "Agregar a favoritas",
-                        tint = if (song.isFavorite) Color(0xFFFF5F7E) else Color(0xFF3A3A50)
+                        Icons.Default.MoreVert,
+                        contentDescription = "Opciones",
+                        tint = Color(0xFF6B6B85),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
 
         item { Spacer(Modifier.height(90.dp)) }
+    }
+
+    // Song Options Sheet
+    selectedSong?.let { song ->
+        val songIndex = filteredSongs.indexOf(song).coerceAtLeast(0)
+        SongOptionsSheet(
+            song = song,
+            playlists = playlists,
+            coverGradient = libraryCoverBrushes[songIndex % libraryCoverBrushes.size],
+            onDismiss = { selectedSong = null },
+            onPlayNext = {
+                viewModel.playNext(song)
+                selectedSong = null
+            },
+            onAddToQueue = {
+                viewModel.addToQueue(song)
+                selectedSong = null
+            },
+            onAddToPlaylist = { playlistId ->
+                viewModel.addSongToPlaylist(playlistId, song.id)
+                selectedSong = null
+            }
+            // onRemoveFromPlaylist is null here (not a playlist context)
+        )
     }
 }
 
