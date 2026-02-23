@@ -154,6 +154,26 @@ class MusicPlayerController @Inject constructor(
         playSongs(listOf(song), 0)
     }
 
+    fun playNext(song: Song) {
+        mediaController?.let { controller ->
+            val insertIndex = (controller.currentMediaItemIndex + 1)
+                .coerceAtMost(controller.mediaItemCount)
+            controller.addMediaItem(insertIndex, song.toMediaItem())
+            val updatedQueue = _playerState.value.queue.toMutableList()
+            updatedQueue.add(insertIndex, song)
+            _playerState.value = _playerState.value.copy(queue = updatedQueue)
+        }
+    }
+
+    fun addToQueue(song: Song) {
+        mediaController?.let { controller ->
+            controller.addMediaItem(song.toMediaItem())
+            val updatedQueue = _playerState.value.queue.toMutableList()
+            updatedQueue.add(song)
+            _playerState.value = _playerState.value.copy(queue = updatedQueue)
+        }
+    }
+
     fun play() {
         mediaController?.play()
     }

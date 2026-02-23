@@ -35,14 +35,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -107,6 +111,7 @@ fun PlaylistDetailScreen(
     val allSongs by viewModel.songs.collectAsState()
 
     var showAddSheet by remember { mutableStateOf(false) }
+    var selectedSongForOptions by remember { mutableStateOf<Song?>(null) }
 
     val playlist = remember(playlists, playlistId) { playlists.find { it.id == playlistId } }
     val playlistName = playlist?.name ?: "Mi Playlist"
@@ -192,7 +197,7 @@ fun PlaylistDetailScreen(
                         viewModel.playSongs(playlistSongs, index)
                         onNavigateToPlayer()
                     },
-                    onRemove = { viewModel.removeSongFromPlaylist(playlistId, song.id) }
+                    onMoreClick = { selectedSongForOptions = song }
                 )
             }
 
@@ -211,6 +216,31 @@ fun PlaylistDetailScreen(
                     viewModel.addSongToPlaylist(playlistId, song.id)
                 }
                 showAddSheet = false
+            }
+        )
+    }
+
+    selectedSongForOptions?.let { song ->
+        SongOptionsSheet(
+            song = song,
+            playlists = playlists.filter { it.id != playlistId },
+            coverGradient = coverBrushes[playlistSongs.indexOf(song).coerceAtLeast(0) % coverBrushes.size],
+            onDismiss = { selectedSongForOptions = null },
+            onPlayNext = {
+                viewModel.playNext(song)
+                selectedSongForOptions = null
+            },
+            onAddToQueue = {
+                viewModel.addToQueue(song)
+                selectedSongForOptions = null
+            },
+            onAddToPlaylist = { targetPlaylistId ->
+                viewModel.addSongToPlaylist(targetPlaylistId, song.id)
+                selectedSongForOptions = null
+            },
+            onRemoveFromPlaylist = {
+                viewModel.removeSongFromPlaylist(playlistId, song.id)
+                selectedSongForOptions = null
             }
         )
     }
@@ -452,7 +482,7 @@ private fun PlaylistSongRow(
     gradient: List<Color>,
     isLast: Boolean,
     onPlay: () -> Unit,
-    onRemove: () -> Unit
+    onMoreClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -515,16 +545,16 @@ private fun PlaylistSongRow(
             modifier = Modifier.padding(end = 2.dp)
         )
 
-        // Remove icon
+        // More options icon
         IconButton(
-            onClick = onRemove,
+            onClick = onMoreClick,
             modifier = Modifier.size(32.dp)
         ) {
             Icon(
-                Icons.Default.Close,
-                contentDescription = "Quitar",
-                tint = TextMuted.copy(alpha = 0.5f),
-                modifier = Modifier.size(16.dp)
+                Icons.Default.MoreVert,
+                contentDescription = "Opciones",
+                tint = TextMuted.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -626,6 +656,244 @@ private fun EmptyPlaylistContent(onAddClick: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Text("Esta playlist está esperando ser llenada ✨", color = TextMuted.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(100.dp))
+    }
+}
+
+// ── Song Options Bottom Sheet ──────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SongOptionsSheet(
+    song: Song,
+    playlists: List<com.example.reproductor.domain.model.Playlist>,
+    coverGradient: List<Color>,
+    onDismiss: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: (Long) -> Unit,
+    onRemoveFromPlaylist: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showPlaylistPicker by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF0D1320),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.18f))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+        ) {
+            // ── Song info header ─────────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Brush.linearGradient(coverGradient)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.55f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = song.artist,
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = Color(0xFF1B2238)
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // ── Actions ──────────────────────────────────────────────────────
+            if (!showPlaylistPicker) {
+                SongOptionItem(
+                    icon = Icons.Default.SkipNext,
+                    iconTint = Color(0xFF7B61FF),
+                    iconBg = Color(0xFF7B61FF).copy(alpha = 0.14f),
+                    label = "Reproducir a continuación",
+                    onClick = onPlayNext
+                )
+                SongOptionItem(
+                    icon = Icons.Default.QueueMusic,
+                    iconTint = Color(0xFF4FD5FF),
+                    iconBg = Color(0xFF4FD5FF).copy(alpha = 0.14f),
+                    label = "Añadir a la cola",
+                    onClick = onAddToQueue
+                )
+                SongOptionItem(
+                    icon = Icons.Default.LibraryAdd,
+                    iconTint = Color(0xFF00C896),
+                    iconBg = Color(0xFF00C896).copy(alpha = 0.14f),
+                    label = "Añadir a otra playlist",
+                    onClick = { showPlaylistPicker = true }
+                )
+
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = Color(0xFF1B2238),
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+
+                SongOptionItem(
+                    icon = Icons.Default.Delete,
+                    iconTint = Color(0xFFFF5F7E),
+                    iconBg = Color(0xFFFF5F7E).copy(alpha = 0.14f),
+                    label = "Quitar de la playlist",
+                    labelColor = Color(0xFFFF5F7E),
+                    onClick = onRemoveFromPlaylist
+                )
+            } else {
+                // ── Playlist picker sub-panel ─────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showPlaylistPicker = false }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = TextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        "Elegir playlist",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                if (playlists.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No hay otras playlists", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    playlists.forEach { playlist ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAddToPlaylist(playlist.id) }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF1B2238)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.QueueMusic,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00C896),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Text(
+                                text = playlist.name,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = Color(0xFF1B2238),
+                            modifier = Modifier.padding(start = 74.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SongOptionItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    iconBg: Color,
+    label: String,
+    labelColor: Color = Color.White,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            text = label,
+            color = labelColor,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

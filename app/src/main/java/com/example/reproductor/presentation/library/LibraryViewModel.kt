@@ -169,6 +169,14 @@ class LibraryViewModel @Inject constructor(
         playerController.playSong(song)
     }
 
+    fun playNext(song: Song) {
+        playerController.playNext(song)
+    }
+
+    fun addToQueue(song: Song) {
+        playerController.addToQueue(song)
+    }
+
     fun playSongs(songs: List<Song>, startIndex: Int = 0) {
         playerController.playSongs(songs, startIndex)
     }
