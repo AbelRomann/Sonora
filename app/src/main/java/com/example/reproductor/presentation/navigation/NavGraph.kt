@@ -87,7 +87,8 @@ fun NavGraph(
             PlaylistDetailScreen(
                 playlistId = it.arguments?.getLong("playlistId") ?: 0L,
                 onNavigateToPlayer = onNavigateToPlayer,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onDeletePlaylist = { navController.popBackStack() }
             )
         }
 

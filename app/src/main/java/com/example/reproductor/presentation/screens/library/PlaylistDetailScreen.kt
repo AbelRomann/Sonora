@@ -65,6 +65,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.example.reproductor.presentation.components.SongOptionsSheet
+import com.example.reproductor.presentation.screens.playlists.DeletePlaylistSheetContent
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -104,6 +108,7 @@ fun PlaylistDetailScreen(
     playlistId: Long,
     onNavigateToPlayer: () -> Unit,
     onBackClick: () -> Unit,
+    onDeletePlaylist: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val playlistSongsFlow = remember(playlistId) { viewModel.getSongsForPlaylist(playlistId) }
@@ -113,6 +118,9 @@ fun PlaylistDetailScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedSongForOptions by remember { mutableStateOf<Song?>(null) }
+    var showPlaylistOptions by remember { mutableStateOf(false) }
+    val playlistOptionsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
 
     val playlist = remember(playlists, playlistId) { playlists.find { it.id == playlistId } }
     val playlistName = playlist?.name ?: "Mi Playlist"
@@ -135,6 +143,7 @@ fun PlaylistDetailScreen(
                 totalDurationMs = totalDurationMs,
                 onBackClick = onBackClick,
                 onAddClick = { showAddSheet = true },
+                onMoreClick = { showPlaylistOptions = true },
                 canPlay = !isEmpty,
                 onPlayClick = {
                     viewModel.playSongs(playlistSongs, 0)
@@ -221,6 +230,44 @@ fun PlaylistDetailScreen(
         )
     }
 
+    // ── Playlist options sheet (3-dot menu) ───────────────────────────────────
+    if (showPlaylistOptions) {
+        ModalBottomSheet(
+            onDismissRequest = { showPlaylistOptions = false },
+            sheetState = playlistOptionsSheetState,
+            containerColor = Color(0xFF12121E),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                topStart = 28.dp, topEnd = 28.dp
+            ),
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 12.dp)
+                        .size(width = 40.dp, height = 4.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color(0xFF3A3A5A))
+                )
+            }
+        ) {
+            DeletePlaylistSheetContent(
+                playlistName = playlistName,
+                songCount = playlistSongs.size,
+                onCancel = {
+                    scope.launch { playlistOptionsSheetState.hide() }
+                        .invokeOnCompletion { showPlaylistOptions = false }
+                },
+                onConfirmDelete = {
+                    viewModel.deletePlaylist(playlistId)
+                    scope.launch { playlistOptionsSheetState.hide() }
+                        .invokeOnCompletion {
+                            showPlaylistOptions = false
+                            onDeletePlaylist()
+                        }
+                }
+            )
+        }
+    }
+
     selectedSongForOptions?.let { song ->
         val songIndex = playlistSongs.indexOf(song).coerceAtLeast(0)
         SongOptionsSheet(
@@ -257,6 +304,7 @@ private fun PlaylistHeader(
     totalDurationMs: Long,
     onBackClick: () -> Unit,
     onAddClick: () -> Unit,
+    onMoreClick: () -> Unit,
     canPlay: Boolean,
     onPlayClick: () -> Unit,
     onShuffleClick: () -> Unit
@@ -331,7 +379,8 @@ private fun PlaylistHeader(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f)),
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .clickable(onClick = onMoreClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = Color.White, modifier = Modifier.size(20.dp))
