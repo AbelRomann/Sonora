@@ -40,13 +40,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,8 +66,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.PlaybackMode
+import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.formatDuration
-import com.example.reproductor.presentation.player.PlayerViewModel
+import com.example.reproductor.presentation.screens.player.PlayerViewModel
 
 // ── Color palette ──────────────────────────────────────────────
 private val BgTop = Color(0xFF12022A)
@@ -88,6 +92,11 @@ fun PlayerScreen(
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val playbackMode by viewModel.playbackMode.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong
+
+    // ── Queue sheet state ────────────────────────────────────────
+    var showQueueSheet by remember { mutableStateOf(false) }
+    val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
 
     // ── Seek state ──────────────────────────────────────────────
     var isUserSeeking by remember { mutableStateOf(false) }
@@ -168,7 +177,9 @@ fun PlayerScreen(
         SecondaryActionsRow(
             playbackMode = playbackMode,
             isFavorite = currentSong?.isFavorite == true,
-            onTogglePlaybackMode = { viewModel.togglePlaybackMode() }
+            queueSize = playerState.queue.size,
+            onTogglePlaybackMode = { viewModel.togglePlaybackMode() },
+            onOpenQueue = { showQueueSheet = true }
         )
 
         Spacer(Modifier.height(16.dp))
@@ -201,6 +212,25 @@ fun PlayerScreen(
         VolumeBar()
 
         Spacer(Modifier.height(20.dp))
+    }
+
+    // ── Queue bottom sheet ───────────────────────────────────────
+    if (showQueueSheet) {
+        QueueBottomSheet(
+            queue = playerState.queue,
+            currentIndex = playerState.currentIndex,
+            sheetState = queueSheetState,
+            onDismiss = { showQueueSheet = false },
+            onSkipToIndex = { index ->
+                viewModel.skipToIndex(index)
+                scope.launch { queueSheetState.hide() }.invokeOnCompletion {
+                    showQueueSheet = false
+                }
+            },
+            onRemoveAt = { index -> viewModel.removeFromQueue(index) },
+            onMoveItem = { from, to -> viewModel.moveQueueItem(from, to) },
+            onClearQueue = { viewModel.clearQueue() }
+        )
     }
 }
 
@@ -273,7 +303,9 @@ private fun AlbumArtwork(albumArt: String?) {
 private fun SecondaryActionsRow(
     playbackMode: PlaybackMode,
     isFavorite: Boolean,
-    onTogglePlaybackMode: () -> Unit
+    queueSize: Int,
+    onTogglePlaybackMode: () -> Unit,
+    onOpenQueue: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -307,13 +339,15 @@ private fun SecondaryActionsRow(
             modifier = Modifier.size(22.dp)
         )
 
-        // Queue
-        Icon(
-            Icons.AutoMirrored.Filled.QueueMusic,
-            contentDescription = "Cola",
-            tint = NeutralMuted,
-            modifier = Modifier.size(22.dp)
-        )
+        // Queue — tinted accent when queue has songs
+        IconButton(onClick = onOpenQueue, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.QueueMusic,
+                contentDescription = "Cola",
+                tint = if (queueSize > 0) AccentLime else NeutralMuted,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }
 

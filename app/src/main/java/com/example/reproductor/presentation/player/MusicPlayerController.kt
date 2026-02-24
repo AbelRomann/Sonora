@@ -174,6 +174,63 @@ class MusicPlayerController @Inject constructor(
         }
     }
 
+    fun removeFromQueue(index: Int) {
+        mediaController?.let { controller ->
+            if (index < 0 || index >= controller.mediaItemCount) return
+            controller.removeMediaItem(index)
+            val updatedQueue = _playerState.value.queue.toMutableList()
+            if (index < updatedQueue.size) updatedQueue.removeAt(index)
+            _playerState.value = _playerState.value.copy(queue = updatedQueue)
+        }
+    }
+
+    fun skipToIndex(index: Int) {
+        mediaController?.let { controller ->
+            controller.seekTo(index, 0L)
+            controller.play()
+            _playerState.value = _playerState.value.copy(currentIndex = index)
+        }
+    }
+
+    fun moveQueueItem(from: Int, to: Int) {
+        if (from == to) return
+        mediaController?.let { controller ->
+            controller.moveMediaItem(from, to)
+            val updatedQueue = _playerState.value.queue.toMutableList()
+            val item = updatedQueue.removeAt(from)
+            updatedQueue.add(to, item)
+            // Recalculate currentIndex after reorder
+            val newCurrentIndex = when {
+                _playerState.value.currentIndex == from -> to
+                from < _playerState.value.currentIndex && to >= _playerState.value.currentIndex ->
+                    _playerState.value.currentIndex - 1
+                from > _playerState.value.currentIndex && to <= _playerState.value.currentIndex ->
+                    _playerState.value.currentIndex + 1
+                else -> _playerState.value.currentIndex
+            }
+            _playerState.value = _playerState.value.copy(queue = updatedQueue, currentIndex = newCurrentIndex)
+        }
+    }
+
+    fun clearQueue() {
+        mediaController?.let { controller ->
+            // Keep only the currently-playing item
+            val currentIndex = controller.currentMediaItemIndex
+            val count = controller.mediaItemCount
+            // Remove items after current
+            if (currentIndex + 1 < count) {
+                controller.removeMediaItems(currentIndex + 1, count)
+            }
+            // Remove items before current
+            if (currentIndex > 0) {
+                controller.removeMediaItems(0, currentIndex)
+            }
+            val currentSong = _playerState.value.currentSong
+            val newQueue = if (currentSong != null) listOf(currentSong) else emptyList()
+            _playerState.value = _playerState.value.copy(queue = newQueue, currentIndex = 0)
+        }
+    }
+
     fun play() {
         mediaController?.play()
     }
