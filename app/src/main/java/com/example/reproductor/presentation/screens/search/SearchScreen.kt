@@ -94,7 +94,7 @@ fun SearchScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                     )
                 }
-                items(searchResults, key = { it.id }) { song ->
+                items(searchResults, key = { it.id }, contentType = { "SongItem" }) { song ->
                     SongItem(song = song, onClick = {
                         viewModel.playSong(song)
                         onNavigateToPlayer()

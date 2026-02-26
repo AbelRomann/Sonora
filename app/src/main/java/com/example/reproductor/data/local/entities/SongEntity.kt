@@ -19,6 +19,17 @@ data class SongEntity(
     val isFavorite: Boolean = false
 )
 
+@androidx.room.Fts4(contentEntity = SongEntity::class)
+@Entity(tableName = "songs_fts")
+data class SongFtsEntity(
+    @androidx.room.ColumnInfo(name = "rowid")
+    @PrimaryKey
+    val rowid: Long,
+    val title: String,
+    val artist: String,
+    val album: String
+)
+
 fun SongEntity.toDomain() = Song(
     id = id,
     title = title,

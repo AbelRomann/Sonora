@@ -337,7 +337,7 @@ fun HomeScreen(
         }
 
         // ── Recents List ──
-        items(songs.take(5), key = { it.id }) { song ->
+        items(songs.take(5), key = { it.id }, contentType = { "SongItem" }) { song ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

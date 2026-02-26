@@ -133,7 +133,7 @@ fun AlbumScreen(
             }
 
             // Canciones
-            itemsIndexed(songs) { index, song ->
+            itemsIndexed(songs, key = { _, s -> s.id }, contentType = { _, _ -> "SongItem" }) { index, song ->
                 SongItem(
                     song = song,
                     onClick = {

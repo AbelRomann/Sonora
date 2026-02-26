@@ -98,7 +98,7 @@ fun LibraryScreen(
             Text("${filteredSongs.size} canciones", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         }
 
-        itemsIndexed(filteredSongs.take(50), key = { _, s -> s.id }) { index, song ->
+        itemsIndexed(filteredSongs.take(50), key = { _, s -> s.id }, contentType = { _, _ -> "SongItem" }) { index, song ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

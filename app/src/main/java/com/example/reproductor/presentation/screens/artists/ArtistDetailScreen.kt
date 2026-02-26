@@ -128,7 +128,7 @@ fun ArtistDetailScreen(
                     Spacer(Modifier.height(8.dp))
                 }
 
-                itemsIndexed(songs, key = { _, s -> s.id }) { index, song ->
+                itemsIndexed(songs, key = { _, s -> s.id }, contentType = { _, _ -> "SongItem" }) { index, song ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

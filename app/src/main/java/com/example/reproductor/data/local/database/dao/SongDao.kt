@@ -36,7 +36,12 @@ interface SongDao {
     @Query("DELETE FROM songs")
     suspend fun deleteAllSongs()
 
-    @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY dateAdded DESC, id DESC")
+    @Query("""
+        SELECT songs.* FROM songs 
+        JOIN songs_fts ON songs.id = songs_fts.rowid 
+        WHERE songs_fts MATCH :query 
+        ORDER BY songs.dateAdded DESC, songs.id DESC
+    """)
     fun searchSongs(query: String): Flow<List<SongEntity>>
 
     @Query("UPDATE songs SET isFavorite = NOT isFavorite WHERE id = :songId")
