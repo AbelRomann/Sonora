@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
@@ -72,6 +74,7 @@ fun SongOptionsSheet(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onAddToPlaylist: (Long) -> Unit,
+    onToggleFavorite: () -> Unit,
     onRemoveFromPlaylist: (() -> Unit)? = null  // null = not in a playlist context
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -163,6 +166,13 @@ fun SongOptionsSheet(
                     iconBg = Color(0xFF00C896).copy(alpha = 0.14f),
                     label = "Añadir a playlist",
                     onClick = { showPlaylistPicker = true }
+                )
+                SongOptionItem(
+                    icon = if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    iconTint = if (song.isFavorite) Color(0xFFFF5F7E) else Color(0xFF6B6B85),
+                    iconBg = (if (song.isFavorite) Color(0xFFFF5F7E) else Color(0xFF6B6B85)).copy(alpha = 0.14f),
+                    label = if (song.isFavorite) "Quitar de favoritos" else "Añadir a favoritos",
+                    onClick = onToggleFavorite
                 )
 
                 // Destructive action — only when inside a playlist

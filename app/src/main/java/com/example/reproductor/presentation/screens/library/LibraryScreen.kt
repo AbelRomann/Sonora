@@ -165,6 +165,10 @@ fun LibraryScreen(
             onAddToPlaylist = { playlistId ->
                 viewModel.addSongToPlaylist(playlistId, song.id)
                 selectedSong = null
+            },
+            onToggleFavorite = {
+                viewModel.toggleFavorite(song.id)
+                selectedSong = null
             }
             // onRemoveFromPlaylist is null here (not a playlist context)
         )

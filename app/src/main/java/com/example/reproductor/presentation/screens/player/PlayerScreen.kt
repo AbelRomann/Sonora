@@ -1,6 +1,7 @@
 package com.example.reproductor.presentation.screens.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,10 +65,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.Player
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.example.reproductor.domain.model.PlaybackMode
+
 import com.example.reproductor.presentation.components.QueueBottomSheet
+import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
 
@@ -90,13 +94,18 @@ fun PlayerScreen(
 ) {
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
-    val playbackMode by viewModel.playbackMode.collectAsStateWithLifecycle()
+    val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
+    val shuffleModeEnabled by viewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
     val currentSong = playerState.currentSong
 
     // ── Queue sheet state ────────────────────────────────────────
     var showQueueSheet by remember { mutableStateOf(false) }
     val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+
+    // ── Song options sheet state ────────────────────────────────
+    var showSongOptionsSheet by remember { mutableStateOf(false) }
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     // ── Seek state ──────────────────────────────────────────────
     var isUserSeeking by remember { mutableStateOf(false) }
@@ -112,13 +121,14 @@ fun PlayerScreen(
     }
 
     // ── Root container ──────────────────────────────────────────
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(BgTop, BgBottom)))
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(BgTop, BgBottom)))
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
         Spacer(Modifier.height(12.dp))
 
@@ -175,10 +185,12 @@ fun PlayerScreen(
 
         // ── Secondary actions ───────────────────────────────────
         SecondaryActionsRow(
-            playbackMode = playbackMode,
+            repeatMode = repeatMode,
+            shuffleModeEnabled = shuffleModeEnabled,
             isFavorite = currentSong?.isFavorite == true,
             queueSize = playerState.queue.size,
-            onTogglePlaybackMode = { viewModel.togglePlaybackMode() },
+            onToggleRepeatMode = { viewModel.toggleRepeatMode() },
+            onToggleShuffleMode = { viewModel.toggleShuffleMode() },
             onOpenQueue = { showQueueSheet = true }
         )
 
@@ -203,15 +215,40 @@ fun PlayerScreen(
             isPlaying = playerState.isPlaying,
             onPlayPause = { viewModel.togglePlayPause() },
             onNext = { viewModel.skipToNext() },
-            onPrevious = { viewModel.skipToPrevious() }
+            onPrevious = { viewModel.skipToPrevious() },
+            onAddClick = { showSongOptionsSheet = true }
         )
 
         Spacer(Modifier.weight(1f))
 
-        // ── Volume bar ──────────────────────────────────────────
-        VolumeBar()
+
 
         Spacer(Modifier.height(20.dp))
+        }
+
+        // ── Drag handle para abrir la cola ──
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(48.dp)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { _, dragAmount ->
+                        if (dragAmount < -15) {
+                            showQueueSheet = true
+                        }
+                    }
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f))
+            )
+        }
     }
 
     // ── Queue bottom sheet ───────────────────────────────────────
@@ -230,6 +267,32 @@ fun PlayerScreen(
             onRemoveAt = { index -> viewModel.removeFromQueue(index) },
             onMoveItem = { from, to -> viewModel.moveQueueItem(from, to) },
             onClearQueue = { viewModel.clearQueue() }
+        )
+    }
+
+    // ── Song options bottom sheet ────────────────────────────────
+    if (showSongOptionsSheet && currentSong != null) {
+        SongOptionsSheet(
+            song = currentSong,
+            playlists = playlists,
+            coverGradient = listOf(ArtworkGrad1, ArtworkGrad2, ArtworkGrad3),
+            onDismiss = { showSongOptionsSheet = false },
+            onPlayNext = {
+                viewModel.playNext(currentSong)
+                showSongOptionsSheet = false
+            },
+            onAddToQueue = {
+                viewModel.addToQueue(currentSong)
+                showSongOptionsSheet = false
+            },
+            onAddToPlaylist = { playlistId ->
+                viewModel.addSongToPlaylist(playlistId, currentSong.id)
+                showSongOptionsSheet = false
+            },
+            onToggleFavorite = {
+                viewModel.toggleFavorite(currentSong.id)
+                showSongOptionsSheet = false
+            }
         )
     }
 }
@@ -301,10 +364,12 @@ private fun AlbumArtwork(albumArt: String?) {
 
 @Composable
 private fun SecondaryActionsRow(
-    playbackMode: PlaybackMode,
+    repeatMode: Int,
+    shuffleModeEnabled: Boolean,
     isFavorite: Boolean,
     queueSize: Int,
-    onTogglePlaybackMode: () -> Unit,
+    onToggleRepeatMode: () -> Unit,
+    onToggleShuffleMode: () -> Unit,
     onOpenQueue: () -> Unit
 ) {
     Row(
@@ -312,15 +377,14 @@ private fun SecondaryActionsRow(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Repeat / mode icon
-        IconButton(onClick = onTogglePlaybackMode, modifier = Modifier.size(40.dp)) {
-            val (icon, tint) = when (playbackMode) {
-                PlaybackMode.REPEAT_ONE -> Icons.Default.RepeatOne to AccentLime
-                PlaybackMode.REPEAT_ALL -> Icons.Default.Repeat to AccentLime
-                PlaybackMode.SHUFFLE -> Icons.Default.Shuffle to AccentLime
-                PlaybackMode.NORMAL -> Icons.Default.Replay to NeutralMuted
+        // Repeat mode icon
+        IconButton(onClick = onToggleRepeatMode, modifier = Modifier.size(40.dp)) {
+            val (icon, tint) = when (repeatMode) {
+                Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne to AccentLime
+                Player.REPEAT_MODE_ALL -> Icons.Default.Repeat to AccentLime
+                else -> Icons.Default.Replay to NeutralMuted
             }
-            Icon(icon, contentDescription = "Modo de reproducción", tint = tint, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = "Repetir", tint = tint, modifier = Modifier.size(22.dp))
         }
 
         // Favorite
@@ -332,12 +396,14 @@ private fun SecondaryActionsRow(
         )
 
         // Shuffle indicator
-        Icon(
-            Icons.Default.Shuffle,
-            contentDescription = "Aleatorio",
-            tint = if (playbackMode == PlaybackMode.SHUFFLE) AccentLime else NeutralMuted,
-            modifier = Modifier.size(22.dp)
-        )
+        IconButton(onClick = onToggleShuffleMode, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Shuffle,
+                contentDescription = "Aleatorio",
+                tint = if (shuffleModeEnabled) AccentLime else NeutralMuted,
+                modifier = Modifier.size(22.dp)
+            )
+        }
 
         // Queue — tinted accent when queue has songs
         IconButton(onClick = onOpenQueue, modifier = Modifier.size(40.dp)) {
@@ -403,7 +469,8 @@ private fun TransportControls(
     isPlaying: Boolean,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
-    onPrevious: () -> Unit
+    onPrevious: () -> Unit,
+    onAddClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -462,11 +529,11 @@ private fun TransportControls(
             )
         }
 
-        // Add to queue
-        IconButton(onClick = { /* add */ }) {
+        // Add to queue / playlist
+        IconButton(onClick = onAddClick) {
             Icon(
                 Icons.Default.AddBox,
-                contentDescription = "Agregar",
+                contentDescription = "Opciones de canción",
                 tint = NeutralMuted,
                 modifier = Modifier.size(28.dp)
             )
@@ -474,47 +541,3 @@ private fun TransportControls(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VolumeBar() {
-    var volume by remember { mutableFloatStateOf(0.5f) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Default.VolumeDown,
-            contentDescription = null,
-            tint = NeutralDark,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Slider(
-            value = volume,
-            onValueChange = { volume = it },
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White.copy(alpha = 0.6f),
-                activeTrackColor = NeutralMuted.copy(alpha = 0.4f),
-                inactiveTrackColor = TrackInactive
-            ),
-            thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.7f))
-                )
-            }
-        )
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            Icons.Default.VolumeUp,
-            contentDescription = null,
-            tint = NeutralDark,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}

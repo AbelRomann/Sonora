@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,20 +25,25 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,10 +61,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.library.LibraryViewModel
 import com.example.reproductor.presentation.player.PlayerViewModel
+import androidx.media3.common.Player
+import kotlinx.coroutines.launch
 import com.example.reproductor.ui.theme.AccentLime
 import com.example.reproductor.ui.theme.CardGradientEnd
 import com.example.reproductor.ui.theme.CardGradientStart
@@ -68,7 +78,7 @@ import com.example.reproductor.ui.theme.RecentCardBg
 import com.example.reproductor.ui.theme.TextMuted
 import com.example.reproductor.ui.theme.TextSubtle
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToPlayer: () -> Unit,
@@ -78,7 +88,13 @@ fun HomeScreen(
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val playerState by playerViewModel.playerState.collectAsStateWithLifecycle()
+    val repeatMode by playerViewModel.repeatMode.collectAsStateWithLifecycle()
+    val shuffleModeEnabled by playerViewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+
+    var showQueueSheet by remember { mutableStateOf(false) }
+    val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { viewModel.refreshMusicOnFirstSessionEntry() }
 
@@ -95,13 +111,14 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PlayerBackground)
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PlayerBackground)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
         // ── Block 1: Header ──
         item {
             Spacer(Modifier.height(48.dp))
@@ -212,13 +229,18 @@ fun HomeScreen(
                     ) {
                         // Repeat
                         IconButton(
-                            onClick = { playerViewModel.togglePlaybackMode() },
+                            onClick = { playerViewModel.toggleRepeatMode() },
                             modifier = Modifier.size(36.dp)
                         ) {
+                            val (icon, tint) = when (repeatMode) {
+                                Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne to AccentLime
+                                Player.REPEAT_MODE_ALL -> Icons.Default.Repeat to AccentLime
+                                else -> Icons.Default.Replay to TextMuted
+                            }
                             Icon(
-                                Icons.Default.Repeat,
+                                icon,
                                 contentDescription = "Repetir",
-                                tint = TextMuted,
+                                tint = tint,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -274,13 +296,13 @@ fun HomeScreen(
 
                         // Shuffle
                         IconButton(
-                            onClick = { playerViewModel.togglePlaybackMode() },
+                            onClick = { playerViewModel.toggleShuffleMode() },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 Icons.Default.Shuffle,
                                 contentDescription = "Aleatorio",
-                                tint = TextMuted,
+                                tint = if (shuffleModeEnabled) AccentLime else TextMuted,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -399,6 +421,9 @@ fun HomeScreen(
         item { Spacer(Modifier.height(100.dp)) }
     }
 
+
+    }
+
     // ── Song Options Sheet ────────────────────────────────────────────────────
     selectedSong?.let { song ->
         val songIndex = songs.indexOf(song).coerceAtLeast(0)
@@ -427,7 +452,30 @@ fun HomeScreen(
             onAddToPlaylist = { playlistId ->
                 viewModel.addSongToPlaylist(playlistId, song.id)
                 selectedSong = null
+            },
+            onToggleFavorite = {
+                viewModel.toggleFavorite(song.id)
+                selectedSong = null
             }
+        )
+    }
+
+    // ── Queue bottom sheet ───────────────────────────────────────
+    if (showQueueSheet) {
+        QueueBottomSheet(
+            queue = playerState.queue,
+            currentIndex = playerState.currentIndex,
+            sheetState = queueSheetState,
+            onDismiss = { showQueueSheet = false },
+            onSkipToIndex = { index ->
+                playerViewModel.skipToIndex(index)
+                scope.launch { queueSheetState.hide() }.invokeOnCompletion {
+                    showQueueSheet = false
+                }
+            },
+            onRemoveAt = { index -> playerViewModel.removeFromQueue(index) },
+            onMoveItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
+            onClearQueue = { playerViewModel.clearQueue() }
         )
     }
 }

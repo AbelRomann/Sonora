@@ -290,6 +290,10 @@ fun PlaylistDetailScreen(
             onRemoveFromPlaylist = {
                 viewModel.removeSongFromPlaylist(playlistId, song.id)
                 selectedSongForOptions = null
+            },
+            onToggleFavorite = {
+                viewModel.toggleFavorite(song.id)
+                selectedSongForOptions = null
             }
         )
     }

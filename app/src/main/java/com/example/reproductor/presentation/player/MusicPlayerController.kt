@@ -10,7 +10,6 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
-import com.example.reproductor.domain.model.PlaybackMode
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.service.MusicPlayerService
 import com.google.common.util.concurrent.MoreExecutors
@@ -43,8 +42,11 @@ class MusicPlayerController @Inject constructor(
     private val _playbackProgress = MutableStateFlow(PlaybackProgress())
     val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
 
-    private val _playbackMode = MutableStateFlow(PlaybackMode.NORMAL)
-    val playbackMode: StateFlow<PlaybackMode> = _playbackMode.asStateFlow()
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    private val _shuffleModeEnabled = MutableStateFlow(false)
+    val shuffleModeEnabled: StateFlow<Boolean> = _shuffleModeEnabled.asStateFlow()
 
     init {
         initializeController()
@@ -61,6 +63,10 @@ class MusicPlayerController @Inject constructor(
         controllerFuture.addListener(
             {
                 mediaController = controllerFuture.get()
+                mediaController?.let { controller ->
+                    _repeatMode.value = controller.repeatMode
+                    _shuffleModeEnabled.value = controller.shuffleModeEnabled
+                }
                 setupPlayerListener()
                 startProgressUpdates()
             },
@@ -80,6 +86,14 @@ class MusicPlayerController @Inject constructor(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayerState()
+            }
+
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                _repeatMode.value = repeatMode
+            }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                _shuffleModeEnabled.value = shuffleModeEnabled
             }
         })
     }
@@ -261,34 +275,19 @@ class MusicPlayerController @Inject constructor(
         _playerState.value = _playerState.value.copy(currentIndex = newIndex)
     }
 
-    fun togglePlaybackMode() {
-        val newMode = when (_playbackMode.value) {
-            PlaybackMode.NORMAL -> PlaybackMode.REPEAT_ALL
-            PlaybackMode.REPEAT_ALL -> PlaybackMode.REPEAT_ONE
-            PlaybackMode.REPEAT_ONE -> PlaybackMode.SHUFFLE
-            PlaybackMode.SHUFFLE -> PlaybackMode.NORMAL
-        }
-        _playbackMode.value = newMode
-
+    fun toggleRepeatMode() {
         mediaController?.let { controller ->
-            when (newMode) {
-                PlaybackMode.NORMAL -> {
-                    controller.repeatMode = Player.REPEAT_MODE_OFF
-                    controller.shuffleModeEnabled = false
-                }
-                PlaybackMode.REPEAT_ALL -> {
-                    controller.repeatMode = Player.REPEAT_MODE_ALL
-                    controller.shuffleModeEnabled = false
-                }
-                PlaybackMode.REPEAT_ONE -> {
-                    controller.repeatMode = Player.REPEAT_MODE_ONE
-                    controller.shuffleModeEnabled = false
-                }
-                PlaybackMode.SHUFFLE -> {
-                    controller.repeatMode = Player.REPEAT_MODE_OFF
-                    controller.shuffleModeEnabled = true
-                }
+            controller.repeatMode = when (controller.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
             }
+        }
+    }
+
+    fun toggleShuffleMode() {
+        mediaController?.let { controller ->
+            controller.shuffleModeEnabled = !controller.shuffleModeEnabled
         }
     }
 

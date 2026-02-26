@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
-import com.example.reproductor.domain.model.PlaybackMode
+
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -17,7 +17,8 @@ class PlayerViewModel @Inject constructor(
 
     val playerState: StateFlow<PlayerState> = playerController.playerState
     val playbackProgress: StateFlow<PlaybackProgress> = playerController.playbackProgress
-    val playbackMode: StateFlow<PlaybackMode> = playerController.playbackMode
+    val repeatMode: StateFlow<Int> = playerController.repeatMode
+    val shuffleModeEnabled: StateFlow<Boolean> = playerController.shuffleModeEnabled
 
     fun togglePlayPause() {
         viewModelScope.launch {
@@ -47,9 +48,39 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun togglePlaybackMode() {
+    fun toggleRepeatMode() {
         viewModelScope.launch {
-            playerController.togglePlaybackMode()
+            playerController.toggleRepeatMode()
+        }
+    }
+
+    fun toggleShuffleMode() {
+        viewModelScope.launch {
+            playerController.toggleShuffleMode()
+        }
+    }
+
+    fun skipToIndex(index: Int) {
+        viewModelScope.launch {
+            playerController.skipToIndex(index)
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        viewModelScope.launch {
+            playerController.removeFromQueue(index)
+        }
+    }
+
+    fun moveQueueItem(from: Int, to: Int) {
+        viewModelScope.launch {
+            playerController.moveQueueItem(from, to)
+        }
+    }
+
+    fun clearQueue() {
+        viewModelScope.launch {
+            playerController.clearQueue()
         }
     }
 
