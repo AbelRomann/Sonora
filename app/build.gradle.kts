@@ -91,6 +91,9 @@ dependencies {
     // Coil (Carga de imágenes - portadas de álbumes)
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // Palette (Extraer colores de portadas)
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Drag & Drop reorder for LazyColumn
     implementation("sh.calvin.reorderable:reorderable:2.4.0")
 

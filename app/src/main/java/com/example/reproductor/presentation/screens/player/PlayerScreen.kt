@@ -69,22 +69,29 @@ import androidx.media3.common.Player
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 
+import androidx.core.graphics.drawable.toBitmap
+import androidx.palette.graphics.Palette
+import coil.request.ImageRequest
+import coil.compose.AsyncImagePainter
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
 
-// ── Color palette ──────────────────────────────────────────────
-private val BgTop = Color(0xFF12022A)
-private val BgBottom = Color(0xFF000000)
+// ── Default Color palette ──────────────────────────────────────
+private val DefaultBgTop = Color(0xFF12022A)
+private val DefaultBgBottom = Color(0xFF000000)
 private val AccentLime = Color(0xFFE8FF47)
 private val NeutralMuted = Color(0xFF6B6B85)
 private val NeutralDark = Color(0xFF3A3A50)
 private val PinkHeart = Color(0xFFFF5F7E)
 private val TrackInactive = Color(0xFF1E1E2E)
-private val ArtworkGrad1 = Color(0xFF7B61FF)
-private val ArtworkGrad2 = Color(0xFFFF5F7E)
-private val ArtworkGrad3 = Color(0xFFFF9A3C)
+private val DefaultArtworkGrad1 = Color(0xFF7B61FF)
+private val DefaultArtworkGrad2 = Color(0xFFFF5F7E)
+private val DefaultArtworkGrad3 = Color(0xFFFF9A3C)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,12 +127,35 @@ fun PlayerScreen(
         }
     }
 
+    // ── Dynamic Colors State ─────────────────────────────────────
+    var bgTop by remember { mutableStateOf(DefaultBgTop) }
+    var bgBottom by remember { mutableStateOf(DefaultBgBottom) }
+    var artworkGrad1 by remember { mutableStateOf(DefaultArtworkGrad1) }
+    var artworkGrad2 by remember { mutableStateOf(DefaultArtworkGrad2) }
+    var artworkGrad3 by remember { mutableStateOf(DefaultArtworkGrad3) }
+
+    LaunchedEffect(currentSong?.albumArt) {
+        if (currentSong?.albumArt == null) {
+            bgTop = DefaultBgTop
+            bgBottom = DefaultBgBottom
+            artworkGrad1 = DefaultArtworkGrad1
+            artworkGrad2 = DefaultArtworkGrad2
+            artworkGrad3 = DefaultArtworkGrad3
+        }
+    }
+
+    val animatedBgTop by animateColorAsState(targetValue = bgTop, label = "bgTop", animationSpec = tween(800))
+    val animatedBgBottom by animateColorAsState(targetValue = bgBottom, label = "bgBottom", animationSpec = tween(800))
+    val animatedArtworkGrad1 by animateColorAsState(targetValue = artworkGrad1, label = "grad1", animationSpec = tween(800))
+    val animatedArtworkGrad2 by animateColorAsState(targetValue = artworkGrad2, label = "grad2", animationSpec = tween(800))
+    val animatedArtworkGrad3 by animateColorAsState(targetValue = artworkGrad3, label = "grad3", animationSpec = tween(800))
+
     // ── Root container ──────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(BgTop, BgBottom)))
+                .background(Brush.verticalGradient(listOf(animatedBgTop, animatedBgBottom)))
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -138,7 +168,25 @@ fun PlayerScreen(
         Spacer(Modifier.height(24.dp))
 
         // ── Album artwork ───────────────────────────────────────
-        AlbumArtwork(albumArt = currentSong?.albumArt)
+        AlbumArtwork(
+            albumArt = currentSong?.albumArt,
+            gradientColors = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
+            onColorsExtracted = { palette ->
+                // Creamos estética oscura para el fondo con el swatch vibrante oscuro o apagado
+                bgTop = palette.darkMutedSwatch?.let { Color(it.rgb) }
+                    ?: palette.darkVibrantSwatch?.let { Color(it.rgb) }
+                    ?: palette.dominantSwatch?.let { Color(it.rgb) }
+                    ?: DefaultBgTop
+                
+                // Efecto cristal/negro en la parte inferior para fusionarse con los controladores
+                bgBottom = Color(0xFF000000)
+
+                // Colores vibrantes para rodear la propia portada en la tarjeta
+                artworkGrad1 = palette.vibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad1
+                artworkGrad2 = palette.lightVibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad2
+                artworkGrad3 = palette.dominantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad3
+            }
+        )
 
         Spacer(Modifier.height(28.dp))
 
@@ -275,7 +323,7 @@ fun PlayerScreen(
         SongOptionsSheet(
             song = currentSong,
             playlists = playlists,
-            coverGradient = listOf(ArtworkGrad1, ArtworkGrad2, ArtworkGrad3),
+            coverGradient = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
             onDismiss = { showSongOptionsSheet = false },
             onPlayNext = {
                 viewModel.playNext(currentSong)
@@ -333,23 +381,39 @@ private fun TopBar(onBackClick: () -> Unit) {
 }
 
 @Composable
-private fun AlbumArtwork(albumArt: String?) {
+private fun AlbumArtwork(
+    albumArt: String?,
+    gradientColors: List<Color>,
+    onColorsExtracted: (Palette) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth(0.82f)
             .aspectRatio(1f)
             .clip(RoundedCornerShape(28.dp))
             .background(
-                Brush.linearGradient(listOf(ArtworkGrad1, ArtworkGrad2, ArtworkGrad3))
+                Brush.linearGradient(gradientColors)
             ),
         contentAlignment = Alignment.Center
     ) {
         if (albumArt != null) {
             AsyncImage(
-                model = albumArt,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(albumArt)
+                    .allowHardware(false) // Necesario para extraer los píxeles hacia Palette
+                    .build(),
                 contentDescription = "Portada del álbum",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                onSuccess = { state ->
+                    val drawable = state.result.drawable
+                    val bitmap = drawable.toBitmap()
+                    Palette.from(bitmap).generate { palette ->
+                        if (palette != null) {
+                            onColorsExtracted(palette)
+                        }
+                    }
+                }
             )
         } else {
             Icon(
