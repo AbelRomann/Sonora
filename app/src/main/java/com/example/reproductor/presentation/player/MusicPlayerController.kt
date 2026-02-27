@@ -139,7 +139,8 @@ class MusicPlayerController @Inject constructor(
 
             _playerState.value = _playerState.value.copy(
                 currentSong = currentSong,
-                isPlaying = controller.isPlaying
+                isPlaying = controller.isPlaying,
+                currentIndex = controller.currentMediaItemIndex
             )
 
             // Sincronizar progreso inmediatamente al cambiar de pista
