@@ -1,5 +1,13 @@
 package com.example.reproductor.presentation.screens.player
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +22,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,10 +56,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +71,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -74,12 +89,11 @@ import androidx.palette.graphics.Palette
 import coil.request.ImageRequest
 import coil.compose.AsyncImagePainter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
+import kotlin.math.absoluteValue
 
 // ── Default Color palette ──────────────────────────────────────
 private val DefaultBgTop = Color(0xFF12022A)
@@ -103,6 +117,8 @@ fun PlayerScreen(
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffleModeEnabled by viewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
+    val queue = playerState.queue
+    val currentIndex = playerState.currentIndex
     val currentSong = playerState.currentSong
 
     // ── Queue sheet state ────────────────────────────────────────
@@ -134,21 +150,79 @@ fun PlayerScreen(
     var artworkGrad2 by remember { mutableStateOf(DefaultArtworkGrad2) }
     var artworkGrad3 by remember { mutableStateOf(DefaultArtworkGrad3) }
 
-    LaunchedEffect(currentSong?.albumArt) {
-        if (currentSong?.albumArt == null) {
-            bgTop = DefaultBgTop
-            bgBottom = DefaultBgBottom
-            artworkGrad1 = DefaultArtworkGrad1
-            artworkGrad2 = DefaultArtworkGrad2
-            artworkGrad3 = DefaultArtworkGrad3
-        }
-    }
 
     val animatedBgTop by animateColorAsState(targetValue = bgTop, label = "bgTop", animationSpec = tween(800))
     val animatedBgBottom by animateColorAsState(targetValue = bgBottom, label = "bgBottom", animationSpec = tween(800))
     val animatedArtworkGrad1 by animateColorAsState(targetValue = artworkGrad1, label = "grad1", animationSpec = tween(800))
     val animatedArtworkGrad2 by animateColorAsState(targetValue = artworkGrad2, label = "grad2", animationSpec = tween(800))
     val animatedArtworkGrad3 by animateColorAsState(targetValue = artworkGrad3, label = "grad3", animationSpec = tween(800))
+
+    // ── HorizontalPager state ────────────────────────────────────
+    val pageCount = if (queue.isNotEmpty()) queue.size else 1
+    val pagerState = rememberPagerState(
+        initialPage = currentIndex.coerceAtLeast(0),
+        pageCount = { pageCount }
+    )
+
+    // Extract colors whenever the settled page changes
+    val context = LocalContext.current
+    LaunchedEffect(pagerState.settledPage, queue) {
+        val song = queue.getOrNull(pagerState.settledPage)
+        val artUri = song?.albumArt
+        if (artUri == null) {
+            bgTop = DefaultBgTop
+            bgBottom = DefaultBgBottom
+            artworkGrad1 = DefaultArtworkGrad1
+            artworkGrad2 = DefaultArtworkGrad2
+            artworkGrad3 = DefaultArtworkGrad3
+        } else {
+            try {
+                val request = ImageRequest.Builder(context)
+                    .data(artUri)
+                    .allowHardware(false)
+                    .build()
+                val result = coil.ImageLoader(context).execute(request)
+                val bitmap = (result.drawable)?.toBitmap()
+                if (bitmap != null) {
+                    Palette.from(bitmap).generate { palette ->
+                        if (palette != null) {
+                            bgTop = palette.darkMutedSwatch?.let { Color(it.rgb) }
+                                ?: palette.darkVibrantSwatch?.let { Color(it.rgb) }
+                                ?: palette.dominantSwatch?.let { Color(it.rgb) }
+                                ?: DefaultBgTop
+                            bgBottom = Color(0xFF000000)
+                            artworkGrad1 = palette.vibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad1
+                            artworkGrad2 = palette.lightVibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad2
+                            artworkGrad3 = palette.dominantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad3
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    // Flag to avoid sync loops between pager and player
+    var isUserSwiping by remember { mutableStateOf(false) }
+    var lastSyncedIndex by remember { mutableIntStateOf(currentIndex) }
+
+    // Pager → Player: when user settles on a new page, skip to that song
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .collectLatest { settledPage ->
+                if (settledPage != lastSyncedIndex && queue.isNotEmpty()) {
+                    lastSyncedIndex = settledPage
+                    viewModel.skipToIndex(settledPage)
+                }
+            }
+    }
+
+    // Player → Pager: when currentIndex changes externally (buttons, headset), animate pager
+    LaunchedEffect(currentIndex) {
+        if (currentIndex >= 0 && currentIndex != pagerState.currentPage && !pagerState.isScrollInProgress) {
+            lastSyncedIndex = currentIndex
+            pagerState.animateScrollToPage(currentIndex)
+        }
+    }
 
     // ── Root container ──────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
@@ -167,66 +241,85 @@ fun PlayerScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Album artwork ───────────────────────────────────────
-        AlbumArtwork(
-            albumArt = currentSong?.albumArt,
-            gradientColors = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
-            onColorsExtracted = { palette ->
-                // Creamos estética oscura para el fondo con el swatch vibrante oscuro o apagado
-                bgTop = palette.darkMutedSwatch?.let { Color(it.rgb) }
-                    ?: palette.darkVibrantSwatch?.let { Color(it.rgb) }
-                    ?: palette.dominantSwatch?.let { Color(it.rgb) }
-                    ?: DefaultBgTop
-                
-                // Efecto cristal/negro en la parte inferior para fusionarse con los controladores
-                bgBottom = Color(0xFF000000)
+        // ── Album artwork carousel (HorizontalPager) ────────────
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            beyondViewportPageCount = 1
+        ) { page ->
+            val song = queue.getOrNull(page)
+            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
 
-                // Colores vibrantes para rodear la propia portada en la tarjeta
-                artworkGrad1 = palette.vibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad1
-                artworkGrad2 = palette.lightVibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad2
-                artworkGrad3 = palette.dominantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad3
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+            AlbumArtwork(
+                albumArt = song?.albumArt,
+                gradientColors = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
+                modifier = Modifier.graphicsLayer {
+                    // Scale + fade effect for adjacent pages
+                    val scale = 1f - (pageOffset * 0.15f).coerceAtMost(0.15f)
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - (pageOffset * 0.4f).coerceAtMost(0.4f)
+                }
+            )
             }
-        )
+        }
 
         Spacer(Modifier.height(28.dp))
 
-        // ── Song info ───────────────────────────────────────────
-        Text(
-            text = currentSong?.title ?: "Sin canción",
-            color = Color.White,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = currentSong?.artist ?: "Artista desconocido",
-            color = NeutralMuted,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-        // Album badge
-        if (currentSong?.album != null && currentSong.album.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = currentSong.album.uppercase(),
-                color = AccentLime.copy(alpha = 0.85f),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(AccentLime.copy(alpha = 0.12f))
-                    .padding(horizontal = 14.dp, vertical = 4.dp)
-            )
+        // ── Song info (animated on change) ───────────────────────
+        val displaySong = queue.getOrNull(pagerState.settledPage) ?: currentSong
+
+        AnimatedContent(
+            targetState = displaySong,
+            transitionSpec = {
+                (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 4 })
+                    .togetherWith(fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 4 })
+            },
+            label = "song_info"
+        ) { song ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = song?.title ?: "Sin canción",
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = song?.artist ?: "Artista desconocido",
+                    color = NeutralMuted,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // Album badge
+                if (song?.album != null && song.album.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = song.album.uppercase(),
+                        color = AccentLime.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AccentLime.copy(alpha = 0.12f))
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(20.dp))
@@ -268,8 +361,6 @@ fun PlayerScreen(
         )
 
         Spacer(Modifier.weight(1f))
-
-
 
         Spacer(Modifier.height(20.dp))
         }
@@ -384,10 +475,10 @@ private fun TopBar(onBackClick: () -> Unit) {
 private fun AlbumArtwork(
     albumArt: String?,
     gradientColors: List<Color>,
-    onColorsExtracted: (Palette) -> Unit
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth(0.82f)
             .aspectRatio(1f)
             .clip(RoundedCornerShape(28.dp))
@@ -400,20 +491,11 @@ private fun AlbumArtwork(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(albumArt)
-                    .allowHardware(false) // Necesario para extraer los píxeles hacia Palette
+                    .allowHardware(false)
                     .build(),
                 contentDescription = "Portada del álbum",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                onSuccess = { state ->
-                    val drawable = state.result.drawable
-                    val bitmap = drawable.toBitmap()
-                    Palette.from(bitmap).generate { palette ->
-                        if (palette != null) {
-                            onColorsExtracted(palette)
-                        }
-                    }
-                }
+                contentScale = ContentScale.Crop
             )
         } else {
             Icon(

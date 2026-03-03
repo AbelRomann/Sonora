@@ -132,6 +132,8 @@ fun QueueBottomSheet(
 
 // ── Drag & Drop queue list ────────────────────────────────────────
 
+private data class QueueItem(val key: Long, val song: Song)
+
 @Composable
 private fun DragDropQueueList(
     queue: List<Song>,
@@ -140,8 +142,17 @@ private fun DragDropQueueList(
     onRemoveAt: (Int) -> Unit,
     onMoveItem: (from: Int, to: Int) -> Unit
 ) {
-    // Local mutable copy for smooth visual reorder before committing
-    var localQueue by remember(queue) { mutableStateOf(queue) }
+    // Local list with stable unique keys
+    var localQueue by remember { mutableStateOf(emptyList<QueueItem>()) }
+
+    LaunchedEffect(queue) {
+        val currentSongs = localQueue.map { it.song }
+        // Update local items if the actual queue contents (not just drag positions) changed
+        if (currentSongs != queue) {
+            var counter = 0L
+            localQueue = queue.map { QueueItem(counter++, it) }
+        }
+    }
 
     val lazyListState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(
@@ -153,10 +164,8 @@ private fun DragDropQueueList(
         }
     )
 
-    // Track which item is being dragged for visual feedback
-    var draggingIndex by remember { mutableStateOf<Int?>(null) }
-
-    LaunchedEffect(queue) { localQueue = queue }
+    var draggingItemKey by remember { mutableStateOf<Long?>(null) }
+    var draggingStartIndex by remember { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         state = lazyListState,
@@ -181,28 +190,13 @@ private fun DragDropQueueList(
 
         itemsIndexed(
             items = localQueue,
-            key = { index, song -> "${song.id}_$index" }
-        ) { index, song ->
+            key = { _, item -> item.key }
+        ) { index, item ->
             val isActive = index == currentIndex
-            val isDraggingThis = draggingIndex == index
-            val isAnyDragging = draggingIndex != null
+            val isDraggingThis = draggingItemKey == item.key
+            val isAnyDragging = draggingItemKey != null
 
-            ReorderableItem(reorderState, key = "${song.id}_$index") { isDragging ->
-                // Commit the reorder when drag ends
-                LaunchedEffect(isDragging) {
-                    if (isDragging) {
-                        draggingIndex = index
-                    } else if (draggingIndex != null) {
-                        // Find the new position of this song in localQueue
-                        val newIndex = localQueue.indexOf(song)
-                        val oldIndex = queue.indexOf(song)
-                        if (oldIndex != -1 && newIndex != -1 && oldIndex != newIndex) {
-                            onMoveItem(oldIndex, newIndex)
-                        }
-                        draggingIndex = null
-                    }
-                }
-
+            ReorderableItem(reorderState, key = item.key) { isDragging ->
                 // Separator label before "Up next"
                 if (!isActive && index == currentIndex + 1 && !isAnyDragging) {
                     Text(
@@ -216,19 +210,23 @@ private fun DragDropQueueList(
                 }
 
                 DraggableQueueCard(
-                    song = song,
+                    song = item.song,
                     isActive = isActive,
                     isDragging = isDragging,
-                    isDimmed = isAnyDragging && !isDragging,
+                    isDimmed = isAnyDragging && !isDraggingThis,
                     dragHandleModifier = Modifier.draggableHandle(
-                        onDragStarted = { draggingIndex = index },
+                        onDragStarted = {
+                            draggingItemKey = item.key
+                            draggingStartIndex = localQueue.indexOf(item)
+                        },
                         onDragStopped = {
-                            val newIndex = localQueue.indexOf(song)
-                            val oldIndex = queue.indexOf(song)
-                            if (oldIndex != -1 && newIndex != -1 && oldIndex != newIndex) {
+                            val oldIndex = draggingStartIndex
+                            val newIndex = localQueue.indexOf(item)
+                            if (oldIndex != null && newIndex != -1 && oldIndex != newIndex) {
                                 onMoveItem(oldIndex, newIndex)
                             }
-                            draggingIndex = null
+                            draggingItemKey = null
+                            draggingStartIndex = null
                         }
                     ),
                     onTap = { if (!isDragging) onSkipToIndex(index) },
@@ -346,20 +344,19 @@ private fun DraggableQueueCard(
                         RoundedCornerShape(14.dp)
                     ) else Modifier
                 )
-                .then(
-                    if (!isDragging) Modifier.pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (offsetX < DISMISS_THRESHOLD) onRemove()
-                                offsetX = 0f
-                            },
-                            onDragCancel = { offsetX = 0f }
-                        ) { _, dragAmount ->
-                            if (offsetX + dragAmount < 0)
-                                offsetX = (offsetX + dragAmount).coerceAtLeast(DISMISS_THRESHOLD - 80f)
-                        }
-                    } else Modifier
-                )
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX < DISMISS_THRESHOLD) onRemove()
+                            offsetX = 0f
+                        },
+                        onDragCancel = { offsetX = 0f }
+                    ) { _, dragAmount ->
+                        if (!isDragging && offsetX + dragAmount < 0)
+                            offsetX = (offsetX + dragAmount).coerceAtLeast(DISMISS_THRESHOLD - 80f)
+                    }
+                }
+                .then(dragHandleModifier)
                 .clickable(enabled = !isDragging) { onTap() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -420,7 +417,7 @@ private fun DraggableQueueCard(
                 Icons.Default.DragHandle,
                 contentDescription = "Reordenar",
                 tint = if (isDragging) QAccent.copy(alpha = 0.85f) else QMuted.copy(alpha = 0.55f),
-                modifier = dragHandleModifier.size(20.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }

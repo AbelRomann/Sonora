@@ -53,6 +53,7 @@ class MusicPlayerService : MediaSessionService() {
         // Configurar MediaSession
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
+            .setCallback(CustomMediaSessionCallback())
             .build()
 
         // Listener para cambios de estado
@@ -129,6 +130,57 @@ class MusicPlayerService : MediaSessionService() {
             .build()
     }
 
-    // The MediaSessionCallback class has been removed as it is not needed for basic playback control.
-    // The MediaSession automatically delegates standard commands to the player.
+    // Custom callback to handle double and triple clicks on headset buttons
+    private inner class CustomMediaSessionCallback : MediaSession.Callback {
+        private var clickCount = 0
+        private var clickRunnable: Runnable? = null
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        private val CLICK_DELAY = 400L // ms
+
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            intent: Intent
+        ): Boolean {
+            val keyEvent = intent.getParcelableExtra<android.view.KeyEvent>(Intent.EXTRA_KEY_EVENT)
+            if (keyEvent != null && keyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                val keyCode = keyEvent.keyCode
+                if (keyCode == android.view.KeyEvent.KEYCODE_HEADSETHOOK || keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                    clickCount++
+                    
+                    clickRunnable?.let { handler.removeCallbacks(it) }
+                    
+                    clickRunnable = Runnable {
+                        when (clickCount) {
+                            1 -> {
+                                if (player.isPlaying) {
+                                    player.pause()
+                                } else {
+                                    player.play()
+                                }
+                            }
+                            2 -> {
+                                player.seekToNext()
+                            }
+                            3 -> {
+                                player.seekToPrevious()
+                            }
+                            else -> {
+                                if (player.isPlaying) {
+                                    player.pause()
+                                } else {
+                                    player.play()
+                                }
+                            }
+                        }
+                        clickCount = 0
+                    }
+                    
+                    handler.postDelayed(clickRunnable!!, CLICK_DELAY)
+                    return true
+                }
+            }
+            return super.onMediaButtonEvent(session, controllerInfo, intent)
+        }
+    }
 }
