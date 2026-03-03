@@ -9,7 +9,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +29,8 @@ fun AlbumScreen(
     onBackClick: () -> Unit,
     viewModel: AlbumViewModel = hiltViewModel()
 ) {
-    val album by viewModel.album.collectAsState()
-    val songs by viewModel.songs.collectAsState()
+    val album by viewModel.album.collectAsStateWithLifecycle()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

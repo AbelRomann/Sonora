@@ -57,7 +57,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -112,9 +112,9 @@ fun PlaylistDetailScreen(
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val playlistSongsFlow = remember(playlistId) { viewModel.getSongsForPlaylist(playlistId) }
-    val playlistSongs by playlistSongsFlow.collectAsState(initial = emptyList())
-    val playlists by viewModel.playlists.collectAsState(initial = emptyList())
-    val allSongs by viewModel.songs.collectAsState()
+    val playlistSongs by playlistSongsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val allSongs by viewModel.songs.collectAsStateWithLifecycle()
 
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedSongForOptions by remember { mutableStateOf<Song?>(null) }

@@ -201,16 +201,18 @@ fun PlayerScreen(
         }
     }
 
-    // Flag to avoid sync loops between pager and player
-    var isUserSwiping by remember { mutableStateOf(false) }
-    var lastSyncedIndex by remember { mutableIntStateOf(currentIndex) }
+    // Flag to prevent sync loops between pager and player
+    var isAnimatingFromPlayer by remember { mutableStateOf(false) }
 
-    // Pager → Player: when user settles on a new page, skip to that song
+    // Pager → Player: when user swipes and settles on a new page, skip to that song
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }
-            .collectLatest { settledPage ->
-                if (settledPage != lastSyncedIndex && queue.isNotEmpty()) {
-                    lastSyncedIndex = settledPage
+            .collect { settledPage ->
+                if (isAnimatingFromPlayer) {
+                    isAnimatingFromPlayer = false
+                    return@collect
+                }
+                if (settledPage != currentIndex && queue.isNotEmpty()) {
                     viewModel.skipToIndex(settledPage)
                 }
             }
@@ -218,8 +220,8 @@ fun PlayerScreen(
 
     // Player → Pager: when currentIndex changes externally (buttons, headset), animate pager
     LaunchedEffect(currentIndex) {
-        if (currentIndex >= 0 && currentIndex != pagerState.currentPage && !pagerState.isScrollInProgress) {
-            lastSyncedIndex = currentIndex
+        if (currentIndex >= 0 && currentIndex != pagerState.currentPage) {
+            isAnimatingFromPlayer = true
             pagerState.animateScrollToPage(currentIndex)
         }
     }

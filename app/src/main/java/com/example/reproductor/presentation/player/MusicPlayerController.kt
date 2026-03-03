@@ -68,7 +68,10 @@ class MusicPlayerController @Inject constructor(
                     _shuffleModeEnabled.value = controller.shuffleModeEnabled
                 }
                 setupPlayerListener()
-                startProgressUpdates()
+                // Only start polling if already playing
+                if (mediaController?.isPlaying == true) {
+                    startProgressUpdates()
+                }
             },
             MoreExecutors.directExecutor()
         )
@@ -78,6 +81,12 @@ class MusicPlayerController @Inject constructor(
         mediaController?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 updatePlayerState()
+                if (isPlaying) {
+                    startProgressUpdates()
+                } else {
+                    stopProgressUpdates()
+                    updateProgress() // one final update to sync position
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -99,13 +108,18 @@ class MusicPlayerController @Inject constructor(
     }
 
     private fun startProgressUpdates() {
-        progressUpdateJob?.cancel()
+        if (progressUpdateJob?.isActive == true) return
         progressUpdateJob = coroutineScope.launch {
             while (isActive) {
                 updateProgress()
                 delay(1000)
             }
         }
+    }
+
+    private fun stopProgressUpdates() {
+        progressUpdateJob?.cancel()
+        progressUpdateJob = null
     }
 
     private fun updateProgress() {
@@ -262,18 +276,10 @@ class MusicPlayerController @Inject constructor(
 
     fun skipToNext() {
         mediaController?.seekToNext()
-        updateCurrentIndex(1)
     }
 
     fun skipToPrevious() {
         mediaController?.seekToPrevious()
-        updateCurrentIndex(-1)
-    }
-
-    private fun updateCurrentIndex(change: Int) {
-        val newIndex = (_playerState.value.currentIndex + change)
-            .coerceIn(0, _playerState.value.queue.size - 1)
-        _playerState.value = _playerState.value.copy(currentIndex = newIndex)
     }
 
     fun toggleRepeatMode() {
