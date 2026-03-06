@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -48,8 +51,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -69,10 +70,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -233,6 +237,7 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(animatedBgTop, animatedBgBottom)))
+                .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -575,41 +580,103 @@ private fun ProgressSection(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit
 ) {
-    Slider(
-        value = sliderPosition,
-        onValueChange = onValueChange,
-        onValueChangeFinished = onValueChangeFinished,
-        modifier = Modifier.fillMaxWidth(),
-        colors = SliderDefaults.colors(
-            thumbColor = Color.White,
-            activeTrackColor = AccentLime.copy(alpha = 0.7f),
-            inactiveTrackColor = TrackInactive
-        ),
-        thumb = {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
+    val trackGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF7B61FF), // purple
+            Color(0xFF9F8FFF),
+            Color(0xFFCCDD77), // soft lime-yellow
+            Color(0xFFE8FF47)  // bright lime
+        )
+    )
+    val thumbGlowColor = Color.White.copy(alpha = 0.25f)
+    val trackHeight = 3.dp
+    val thumbRadius = 6.dp
+    val glowRadius = 14.dp
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(glowRadius * 2)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            val newValue = (offset.x / size.width).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                        },
+                        onHorizontalDrag = { change: androidx.compose.ui.input.pointer.PointerInputChange, _ ->
+                            val newValue = (change.position.x / size.width).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                            change.consume()
+                        },
+                        onDragEnd = { onValueChangeFinished() }
+                    )
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val trackY = center.y
+                val trackHeightPx = trackHeight.toPx()
+                val thumbRadiusPx = thumbRadius.toPx()
+                val glowRadiusPx = glowRadius.toPx()
+                val progressX = sliderPosition * size.width
+
+                // Inactive track (right of thumb)
+                drawRoundRect(
+                    color = Color(0xFF2A2A3F),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, trackY - trackHeightPx / 2),
+                    size = androidx.compose.ui.geometry.Size(size.width, trackHeightPx),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeightPx / 2)
+                )
+
+                // Active gradient track (left of thumb)
+                if (progressX > 0f) {
+                    drawRoundRect(
+                        brush = trackGradient,
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, trackY - trackHeightPx / 2),
+                        size = androidx.compose.ui.geometry.Size(progressX, trackHeightPx),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeightPx / 2)
+                    )
+                }
+
+                // Thumb glow (soft halo)
+                drawCircle(
+                    color = thumbGlowColor,
+                    radius = glowRadiusPx,
+                    center = androidx.compose.ui.geometry.Offset(progressX, trackY),
+                    blendMode = BlendMode.Screen
+                )
+
+                // Thumb circle (bright white)
+                drawCircle(
+                    color = Color.White,
+                    radius = thumbRadiusPx,
+                    center = androidx.compose.ui.geometry.Offset(progressX, trackY)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // Time labels
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatDuration(currentPosition),
+                color = Color(0xFF6B6B8A),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = formatDuration(duration),
+                color = Color(0xFF6B6B8A),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium
             )
         }
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = formatDuration(currentPosition),
-            color = NeutralDark,
-            style = MaterialTheme.typography.labelSmall
-        )
-        Text(
-            text = formatDuration(duration),
-            color = NeutralDark,
-            style = MaterialTheme.typography.labelSmall
-        )
     }
 }
 

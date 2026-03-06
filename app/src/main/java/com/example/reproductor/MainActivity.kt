@@ -28,8 +28,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,13 +65,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Draw content behind system bars
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Make status bar icons white (light) for dark background
+        val windowInsetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.isAppearanceLightStatusBars = false  // white icons on dark bg
+        windowInsetsController.isAppearanceLightNavigationBars = false
         checkAndRequestPermission()
 
         setContent {
             ReproductorTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    if (hasPermission) MusicPlayerApp() else PermissionScreen(onRequestPermission = ::checkAndRequestPermission)
-                }
+                if (hasPermission) MusicPlayerApp() else PermissionScreen(onRequestPermission = ::checkAndRequestPermission)
             }
         }
     }
@@ -98,6 +102,8 @@ fun MusicPlayerApp() {
     val showPlayer = currentRoute == Screen.Player.route
 
     Scaffold(
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
             if (!showPlayer) {
                 Column(modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
@@ -107,7 +113,10 @@ fun MusicPlayerApp() {
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = paddingValues.calculateBottomPadding())
+        ) {
             NavGraph(navController = navController, onNavigateToPlayer = { navController.navigate(Screen.Player.route) })
         }
     }
