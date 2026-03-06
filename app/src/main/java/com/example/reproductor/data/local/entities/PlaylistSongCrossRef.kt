@@ -19,6 +19,9 @@ import androidx.room.ForeignKey
             childColumns = ["songId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        androidx.room.Index("songId")
     ]
 )
 data class PlaylistSongCrossRef(

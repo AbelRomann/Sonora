@@ -179,6 +179,7 @@ fun PlayerScreen(
             try {
                 val request = ImageRequest.Builder(context)
                     .data(artUri)
+                    .size(100) // Much faster palette generation from a small thumbnail
                     .allowHardware(false)
                     .build()
                 val result = coil.ImageLoader(context).execute(request)

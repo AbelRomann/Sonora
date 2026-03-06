@@ -4,7 +4,15 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.reproductor.domain.model.Song
 
-@Entity(tableName = "songs")
+@Entity(
+    tableName = "songs",
+    indices = [
+        androidx.room.Index("artistId"),
+        androidx.room.Index("albumId"),
+        androidx.room.Index("isFavorite"),
+        androidx.room.Index("dateAdded")
+    ]
+)
 data class SongEntity(
     @PrimaryKey val id: Long,
     val title: String,

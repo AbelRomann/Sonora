@@ -4,7 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.reproductor.domain.model.Album
 
-@Entity(tableName = "albums")
+@Entity(
+    tableName = "albums",
+    indices = [
+        androidx.room.Index("artistId")
+    ]
+)
 data class AlbumEntity(
     @PrimaryKey val id: Long,
     val name: String,

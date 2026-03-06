@@ -19,7 +19,7 @@ import com.example.reproductor.data.local.entities.SongFtsEntity
         PlaylistEntity::class,
         PlaylistSongCrossRef::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -38,10 +38,20 @@ abstract class MusicDatabase : RoomDatabase() {
                     "content=`songs`)"
                 )
                 // Usamos content=songs, y para popular la tabla FTS4 inicialmente con content tables, 
-                // insertamos todos los rowids de la tabla principal
                 database.execSQL(
                     "INSERT INTO songs_fts(songs_fts) VALUES ('rebuild')"
                 )
+            }
+        }
+
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_songs_artistId` ON `songs` (`artistId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_songs_albumId` ON `songs` (`albumId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_songs_isFavorite` ON `songs` (`isFavorite`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_songs_dateAdded` ON `songs` (`dateAdded`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_albums_artistId` ON `albums` (`artistId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_playlist_song_cross_ref_songId` ON `playlist_song_cross_ref` (`songId`)")
             }
         }
     }

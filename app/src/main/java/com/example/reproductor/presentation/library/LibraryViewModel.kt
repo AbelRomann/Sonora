@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -70,7 +71,8 @@ class LibraryViewModel @Inject constructor(
             LibraryFilter.RECIENTES -> allSongs.take(30)
             LibraryFilter.FAVORITAS -> favorites
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val albums: StateFlow<List<Album>> = getAlbumsUseCase()
         .onEach { albumList ->
