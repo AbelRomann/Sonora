@@ -62,6 +62,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -136,48 +138,22 @@ fun PlaylistsScreen(
                 )
             }
 
-            // ── Featured Card ───────────────────────────────────────────────
+            // ── Grid (all playlists) ─────────────────────────────────
             if (playlists.isNotEmpty()) {
                 item {
-                    FeaturedPlaylistCard(
-                        playlist = playlists.first(),
-                        onClick = { onNavigateToPlaylistDetail(playlists.first().id) },
-                        onLongClick = { longPressedPlaylist = playlists.first() }
-                    )
-                }
-            }
-
-            // ── Section label ───────────────────────────────────────────────
-            if (playlists.size > 1) {
-                item {
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        text = "Mis Playlists",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-
-            // ── Grid (skip first = featured) ─────────────────────────────────
-            if (playlists.size > 1) {
-                item {
-                    val gridItems = playlists.drop(1)
+                    Spacer(Modifier.height(8.dp))
+                    val rowCount = (playlists.size + 1) / 2
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
-                            // Fixed height to avoid nested scroll conflict
-                            .height((((gridItems.size + 1) / 2) * 180).dp),
+                            .height((rowCount * 230 + (rowCount - 1) * 12).dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         userScrollEnabled = false
                     ) {
-                        items(gridItems, key = { it.id }) { playlist ->
+                        items(playlists, key = { it.id }) { playlist ->
                             val index = playlists.indexOf(playlist) % cardGradients.size
                             PlaylistGridCard(
                                 playlist = playlist,
@@ -198,6 +174,7 @@ fun PlaylistsScreen(
                     EmptyPlaylistsState(onCreateClick = { showCreateDialog = true })
                 }
             }
+
         }
 
         // ── FAB ──────────────────────────────────────────────────────────────
@@ -573,12 +550,31 @@ private fun PlaylistGridCard(
     onLongClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "cardScale"
+    )
 
-    Column(
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF151C2E))
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = accent.copy(alpha = 0.25f),
+                spotColor = accent.copy(alpha = 0.25f)
+            )
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF0D1120))
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -586,49 +582,100 @@ private fun PlaylistGridCard(
                 }
             )
     ) {
-        // Cover area
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .background(Brush.linearGradient(gradient)),
-            contentAlignment = Alignment.Center
-        ) {
-            // Subtle inner glow
+        Column {
+            // ── Cover Area ────────────────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
                     .background(
-                        Brush.radialGradient(listOf(accent.copy(alpha = 0.3f), Color.Transparent)),
-                        shape = CircleShape
+                        Brush.linearGradient(
+                            colors = listOf(
+                                gradient[0],
+                                gradient[0].copy(alpha = 0.7f),
+                                gradient.last().copy(alpha = 0.9f),
+                                gradient.last()
+                            ),
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                        )
                     )
-            )
-            Icon(
-                imageVector = iconVector,
-                contentDescription = null,
-                tint = accent.copy(alpha = 0.9f),
-                modifier = Modifier.size(40.dp)
-            )
-        }
+            ) {
+                // Large glow blob behind icon
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .align(Alignment.Center)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(accent.copy(alpha = 0.35f), Color.Transparent)
+                            ),
+                            shape = CircleShape
+                        )
+                )
 
-        // Info area
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = playlist.name,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = "${playlist.songCount} canciones",
-                color = TextMuted,
-                style = MaterialTheme.typography.labelSmall
-            )
+                // Icon on frosted pill background
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(64.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.22f),
+                            shape = RoundedCornerShape(18.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = iconVector,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+
+                // Bottom gradient text overlay for readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xFF0D1120).copy(alpha = 0.85f))
+                            )
+                        )
+                )
+            }
+
+            // ── Info Area ─────────────────────────────────────────────
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = playlist.name,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = (-0.3).sp
+                )
+                Spacer(Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .background(accent.copy(alpha = 0.8f), CircleShape)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = "${playlist.songCount} canciones",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 0.sp
+                    )
+                }
+            }
         }
     }
 }
