@@ -88,16 +88,21 @@ import androidx.media3.common.Player
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.drawBehind
 import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
-import coil.request.ImageRequest
 import coil.compose.AsyncImagePainter
+import coil.ImageLoader
+import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
 import kotlin.math.absoluteValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // ── Default Color palette ──────────────────────────────────────
 private val DefaultBgTop = Color(0xFF12022A)
@@ -121,9 +126,11 @@ fun PlayerScreen(
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffleModeEnabled by viewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
-    val queue = playerState.queue
-    val currentIndex = playerState.currentIndex
-    val currentSong = playerState.currentSong
+
+    // Fix #9: derivedStateOf to avoid full-tree recomposition
+    val queue by remember { derivedStateOf { playerState.queue } }
+    val currentIndex by remember { derivedStateOf { playerState.currentIndex } }
+    val currentSong by remember { derivedStateOf { playerState.currentSong } }
 
     // ── Queue sheet state ────────────────────────────────────────
     var showQueueSheet by remember { mutableStateOf(false) }
@@ -168,8 +175,9 @@ fun PlayerScreen(
         pageCount = { pageCount }
     )
 
-    // Extract colors whenever the settled page changes
+    // Fix #1 + #2: Reuse singleton ImageLoader & extract palette on IO thread
     val context = LocalContext.current
+    val imageLoader = remember { ImageLoader(context) }
     LaunchedEffect(pagerState.settledPage, queue) {
         val song = queue.getOrNull(pagerState.settledPage)
         val artUri = song?.albumArt
@@ -181,25 +189,24 @@ fun PlayerScreen(
             artworkGrad3 = DefaultArtworkGrad3
         } else {
             try {
-                val request = ImageRequest.Builder(context)
-                    .data(artUri)
-                    .size(100) // Much faster palette generation from a small thumbnail
-                    .allowHardware(false)
-                    .build()
-                val result = coil.ImageLoader(context).execute(request)
-                val bitmap = (result.drawable)?.toBitmap()
-                if (bitmap != null) {
-                    Palette.from(bitmap).generate { palette ->
-                        if (palette != null) {
-                            bgTop = palette.darkMutedSwatch?.let { Color(it.rgb) }
-                                ?: palette.darkVibrantSwatch?.let { Color(it.rgb) }
-                                ?: palette.dominantSwatch?.let { Color(it.rgb) }
-                                ?: DefaultBgTop
-                            bgBottom = Color(0xFF000000)
-                            artworkGrad1 = palette.vibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad1
-                            artworkGrad2 = palette.lightVibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad2
-                            artworkGrad3 = palette.dominantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad3
-                        }
+                withContext(Dispatchers.IO) {
+                    val request = ImageRequest.Builder(context)
+                        .data(artUri)
+                        .size(100)
+                        .allowHardware(false)
+                        .build()
+                    val result = imageLoader.execute(request)
+                    val bitmap = result.drawable?.toBitmap() ?: return@withContext
+                    val palette = Palette.from(bitmap).generate()
+                    withContext(Dispatchers.Main) {
+                        bgTop = palette.darkMutedSwatch?.let { Color(it.rgb) }
+                            ?: palette.darkVibrantSwatch?.let { Color(it.rgb) }
+                            ?: palette.dominantSwatch?.let { Color(it.rgb) }
+                            ?: DefaultBgTop
+                        bgBottom = Color(0xFF000000)
+                        artworkGrad1 = palette.vibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad1
+                        artworkGrad2 = palette.lightVibrantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad2
+                        artworkGrad3 = palette.dominantSwatch?.let { Color(it.rgb) } ?: DefaultArtworkGrad3
                     }
                 }
             } catch (_: Exception) { }
@@ -234,9 +241,12 @@ fun PlayerScreen(
     // ── Root container ──────────────────────────────────────────
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
+            // Fix #5: drawBehind avoids layout-tree recomposition during color animation
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(animatedBgTop, animatedBgBottom)))
+                .drawBehind {
+                    drawRect(Brush.verticalGradient(listOf(animatedBgTop, animatedBgBottom)))
+                }
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -264,7 +274,9 @@ fun PlayerScreen(
             ) {
             AlbumArtwork(
                 albumArt = song?.albumArt,
-                gradientColors = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
+                gradColor1 = animatedArtworkGrad1,
+                gradColor2 = animatedArtworkGrad2,
+                gradColor3 = animatedArtworkGrad3,
                 modifier = Modifier.graphicsLayer {
                     // Scale + fade effect for adjacent pages
                     val scale = 1f - (pageOffset * 0.15f).coerceAtMost(0.15f)
@@ -278,17 +290,18 @@ fun PlayerScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        // ── Song info (animated on change) ───────────────────────
+        // Fix #6: Use songId as targetState to avoid phantom transitions
         val displaySong = queue.getOrNull(pagerState.settledPage) ?: currentSong
 
         AnimatedContent(
-            targetState = displaySong,
+            targetState = displaySong?.id,
             transitionSpec = {
                 (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 4 })
                     .togetherWith(fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 4 })
             },
             label = "song_info"
-        ) { song ->
+        ) { songId ->
+            val song = queue.firstOrNull { it.id == songId } ?: displaySong
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = song?.title ?: "Sin canción",
@@ -418,26 +431,28 @@ fun PlayerScreen(
     }
 
     // ── Song options bottom sheet ────────────────────────────────
-    if (showSongOptionsSheet && currentSong != null) {
+    // Local val needed because delegated properties can't be smart-cast
+    val activeSong = currentSong
+    if (showSongOptionsSheet && activeSong != null) {
         SongOptionsSheet(
-            song = currentSong,
+            song = activeSong,
             playlists = playlists,
             coverGradient = listOf(animatedArtworkGrad1, animatedArtworkGrad2, animatedArtworkGrad3),
             onDismiss = { showSongOptionsSheet = false },
             onPlayNext = {
-                viewModel.playNext(currentSong)
+                viewModel.playNext(activeSong)
                 showSongOptionsSheet = false
             },
             onAddToQueue = {
-                viewModel.addToQueue(currentSong)
+                viewModel.addToQueue(activeSong)
                 showSongOptionsSheet = false
             },
             onAddToPlaylist = { playlistId ->
-                viewModel.addSongToPlaylist(playlistId, currentSong.id)
+                viewModel.addSongToPlaylist(playlistId, activeSong.id)
                 showSongOptionsSheet = false
             },
             onToggleFavorite = {
-                viewModel.toggleFavorite(currentSong.id)
+                viewModel.toggleFavorite(activeSong.id)
                 showSongOptionsSheet = false
             }
         )
@@ -482,25 +497,26 @@ private fun TopBar(onBackClick: () -> Unit) {
 @Composable
 private fun AlbumArtwork(
     albumArt: String?,
-    gradientColors: List<Color>,
+    gradColor1: Color,
+    gradColor2: Color,
+    gradColor3: Color,
     modifier: Modifier = Modifier
 ) {
+    // Fix #8: drawBehind avoids recreating Brush/List objects in composition
     Box(
         modifier = modifier
             .fillMaxWidth(0.82f)
             .aspectRatio(1f)
             .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(gradientColors)
-            ),
+            .drawBehind {
+                drawRect(Brush.linearGradient(listOf(gradColor1, gradColor2, gradColor3)))
+            },
         contentAlignment = Alignment.Center
     ) {
         if (albumArt != null) {
+            // Fix #7: removed allowHardware(false) — only needed for Palette, not display
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(albumArt)
-                    .allowHardware(false)
-                    .build(),
+                model = albumArt,
                 contentDescription = "Portada del álbum",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

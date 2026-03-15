@@ -115,32 +115,43 @@ fun PlayingVisualizer(
     isPlaying: Boolean,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "visualizer")
-    
-    val bar1 by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(350, easing = LinearEasing), RepeatMode.Reverse), label = "b1"
-    )
-    val bar2 by infiniteTransition.animateFloat(
-        initialValue = 0.1f, targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse), label = "b2"
-    )
-    val bar3 by infiniteTransition.animateFloat(
-        initialValue = 0.4f, targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(tween(300, easing = LinearEasing), RepeatMode.Reverse), label = "b3"
-    )
+    // Fix #3: Only run infinite animations when actually playing
+    // This prevents ~60 FPS recomposition on every screen showing MiniPlayer
+    if (isPlaying) {
+        val infiniteTransition = rememberInfiniteTransition(label = "visualizer")
 
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        val h1 by animateFloatAsState(if (isPlaying) bar1 else 0.2f, label = "h1")
-        val h2 by animateFloatAsState(if (isPlaying) bar2 else 0.2f, label = "h2")
-        val h3 by animateFloatAsState(if (isPlaying) bar3 else 0.2f, label = "h3")
+        val bar1 by infiniteTransition.animateFloat(
+            initialValue = 0.3f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(350, easing = LinearEasing), RepeatMode.Reverse), label = "b1"
+        )
+        val bar2 by infiniteTransition.animateFloat(
+            initialValue = 0.1f, targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse), label = "b2"
+        )
+        val bar3 by infiniteTransition.animateFloat(
+            initialValue = 0.4f, targetValue = 0.8f,
+            animationSpec = infiniteRepeatable(tween(300, easing = LinearEasing), RepeatMode.Reverse), label = "b3"
+        )
 
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(h1).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(h2).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(h3).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(bar1).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(bar2).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(bar3).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+        }
+    } else {
+        // Static bars when paused — no animation, no recomposition
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(0.2f).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(0.2f).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(0.2f).clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)).background(color))
+        }
     }
 }

@@ -17,6 +17,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,8 @@ class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private var mediaController: MediaController? = null
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    // Fix #10: SupervisorJob prevents one failure from cancelling the entire scope
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressUpdateJob: Job? = null
 
     // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
@@ -122,15 +124,18 @@ class MusicPlayerController @Inject constructor(
         progressUpdateJob = null
     }
 
+    // Fix #4: Only emit when values actually change to avoid unnecessary recomposition
     private fun updateProgress() {
         mediaController?.let { controller ->
             val currentPosition = controller.currentPosition.coerceAtLeast(0)
             val duration = controller.duration.coerceAtLeast(0)
-            // Solo actualiza el StateFlow de progreso — no toca playerState
-            _playbackProgress.value = PlaybackProgress(
-                currentPosition = currentPosition,
-                duration = duration
-            )
+            val current = _playbackProgress.value
+            if (currentPosition != current.currentPosition || duration != current.duration) {
+                _playbackProgress.value = PlaybackProgress(
+                    currentPosition = currentPosition,
+                    duration = duration
+                )
+            }
         }
     }
 
