@@ -2,6 +2,10 @@ package com.example.reproductor.presentation.screens.player
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,6 +14,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -542,36 +548,103 @@ private fun SecondaryActionsRow(
     onToggleShuffleMode: () -> Unit,
     onOpenQueue: () -> Unit
 ) {
+    // ── Micro-animation: repeat scale pulse ──────────────────────
+    val repeatScale by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "repeatScale"
+    )
+    // Trigger a pulse by toggling a key each time repeatMode changes
+    var repeatPulseKey by remember { mutableStateOf(false) }
+    var repeatAnimScale by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(repeatMode) {
+        repeatAnimScale = 1.25f
+        repeatPulseKey = !repeatPulseKey
+    }
+    val animatedRepeatScale by animateFloatAsState(
+        targetValue = if (repeatAnimScale > 1f) { repeatAnimScale = 1f; 1.25f } else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "repeatPulse"
+    )
+
+    // ── Micro-animation: favorite bounce ─────────────────────────
+    var favAnimTrigger by remember { mutableStateOf(isFavorite) }
+    val favScale by animateFloatAsState(
+        targetValue = if (favAnimTrigger != isFavorite) 1.35f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        finishedListener = { favAnimTrigger = isFavorite },
+        label = "favBounce"
+    )
+
+    // ── Micro-animation: shuffle rotation ────────────────────────
+    var shuffleRotationTarget by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(shuffleModeEnabled) {
+        shuffleRotationTarget += 360f
+    }
+    val shuffleRotation by animateFloatAsState(
+        targetValue = shuffleRotationTarget,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "shuffleRotation"
+    )
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Repeat mode icon
+        // Repeat mode icon — scale pulse on change
         IconButton(onClick = onToggleRepeatMode, modifier = Modifier.size(40.dp)) {
             val (icon, tint) = when (repeatMode) {
                 Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne to AccentLime
                 Player.REPEAT_MODE_ALL -> Icons.Default.Repeat to AccentLime
                 else -> Icons.Default.Replay to NeutralMuted
             }
-            Icon(icon, contentDescription = "Repetir", tint = tint, modifier = Modifier.size(22.dp))
+            Icon(
+                icon,
+                contentDescription = "Repetir",
+                tint = tint,
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer {
+                        scaleX = animatedRepeatScale
+                        scaleY = animatedRepeatScale
+                    }
+            )
         }
 
-        // Favorite
+        // Favorite — bounce on toggle
         Icon(
             imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
             contentDescription = "Favorito",
             tint = if (isFavorite) PinkHeart else NeutralMuted,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier
+                .size(22.dp)
+                .graphicsLayer {
+                    scaleX = favScale
+                    scaleY = favScale
+                }
         )
 
-        // Shuffle indicator
+        // Shuffle indicator — rotate on toggle
         IconButton(onClick = onToggleShuffleMode, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Default.Shuffle,
                 contentDescription = "Aleatorio",
                 tint = if (shuffleModeEnabled) AccentLime else NeutralMuted,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer {
+                        rotationZ = shuffleRotation
+                    }
             )
         }
 
@@ -704,6 +777,18 @@ private fun TransportControls(
     onPrevious: () -> Unit,
     onAddClick: () -> Unit
 ) {
+    // ── Micro-animation: press-scale on hero play/pause button ──
+    val playPauseInteractionSource = remember { MutableInteractionSource() }
+    val isPressed by playPauseInteractionSource.collectIsPressedAsState()
+    val heroScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.88f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "heroScale"
+    )
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -729,11 +814,16 @@ private fun TransportControls(
             )
         }
 
-        // ── PLAY / PAUSE — hero button ──────────────────────────
+        // ── PLAY / PAUSE — hero button with press-scale ─────────
         IconButton(
             onClick = onPlayPause,
+            interactionSource = playPauseInteractionSource,
             modifier = Modifier
                 .size(76.dp)
+                .graphicsLayer {
+                    scaleX = heroScale
+                    scaleY = heroScale
+                }
                 .shadow(
                     elevation = 18.dp,
                     shape = CircleShape,

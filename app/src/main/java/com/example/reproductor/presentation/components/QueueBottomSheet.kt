@@ -155,11 +155,22 @@ private fun DragDropQueueList(
     }
 
     val lazyListState = rememberLazyListState()
+
+    // The "now_playing_label" header is a non-reorderable item inserted at LazyColumn
+    // index 0 when the label is visible. The reorderable library gives us LazyColumn
+    // indices in onMove, but localQueue is 0-based (songs only). We must subtract the
+    // header count before touching the list to avoid IndexOutOfBoundsException.
+    val headerOffset = if (currentIndex >= 0 && currentIndex < localQueue.size) 1 else 0
+
     val reorderState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
         onMove = { from, to ->
-            localQueue = localQueue.toMutableList().also { list ->
-                list.add(to.index, list.removeAt(from.index))
+            val fromIdx = (from.index - headerOffset).coerceIn(localQueue.indices)
+            val toIdx   = (to.index   - headerOffset).coerceIn(0, (localQueue.size - 1).coerceAtLeast(0))
+            if (fromIdx != toIdx && fromIdx in localQueue.indices) {
+                localQueue = localQueue.toMutableList().also { list ->
+                    list.add(toIdx, list.removeAt(fromIdx))
+                }
             }
         }
     )

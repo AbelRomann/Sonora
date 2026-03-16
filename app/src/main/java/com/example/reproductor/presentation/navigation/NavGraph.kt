@@ -1,9 +1,5 @@
 package com.example.reproductor.presentation.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -51,46 +47,51 @@ fun NavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(400)
-            ) + fadeIn(animationSpec = tween(400))
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(400)
-            ) + fadeOut(animationSpec = tween(400))
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(400)
-            ) + fadeIn(animationSpec = tween(400))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(400)
-            ) + fadeOut(animationSpec = tween(400))
-        }
+        // ── Default transitions (hierarchical) ──────────────────────────────
+        // Individual routes override these when needed (top-level, player).
+        enterTransition  = { NavAnimations.hierarchicalEnter },
+        exitTransition   = { NavAnimations.hierarchicalExit },
+        popEnterTransition = { NavAnimations.hierarchicalPopEnter },
+        popExitTransition  = { NavAnimations.hierarchicalPopExit }
     ) {
-        composable(route = Screen.Home.route) {
+
+        // ═════════════════════════════════════════════════════════════════════
+        //  TOP-LEVEL ROUTES  —  lightweight horizontal slide
+        // ═════════════════════════════════════════════════════════════════════
+
+        composable(
+            route = Screen.Home.route,
+            enterTransition  = { NavAnimations.topLevelEnter },
+            exitTransition   = { NavAnimations.topLevelExit },
+            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            popExitTransition  = { NavAnimations.topLevelPopExit }
+        ) {
             HomeScreen(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
             )
         }
 
-        composable(Screen.Library.route) {
+        composable(
+            route = Screen.Library.route,
+            enterTransition  = { NavAnimations.topLevelEnter },
+            exitTransition   = { NavAnimations.topLevelExit },
+            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            popExitTransition  = { NavAnimations.topLevelPopExit }
+        ) {
             LibraryScreen(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToSearch = { navController.navigate(Screen.Search.route) }
             )
         }
 
-        composable(Screen.Playlists.route) {
+        composable(
+            route = Screen.Playlists.route,
+            enterTransition  = { NavAnimations.topLevelEnter },
+            exitTransition   = { NavAnimations.topLevelExit },
+            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            popExitTransition  = { NavAnimations.topLevelPopExit }
+        ) {
             PlaylistsScreen(
                 onNavigateToPlaylistDetail = { playlistId ->
                     navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
@@ -98,7 +99,13 @@ fun NavGraph(
             )
         }
 
-        composable(Screen.Artists.route) {
+        composable(
+            route = Screen.Artists.route,
+            enterTransition  = { NavAnimations.topLevelEnter },
+            exitTransition   = { NavAnimations.topLevelExit },
+            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            popExitTransition  = { NavAnimations.topLevelPopExit }
+        ) {
             ArtistsScreen(
                 onNavigateToArtistDetail = { artistName ->
                     navController.navigate(Screen.ArtistDetail.createRoute(artistName))
@@ -106,11 +113,16 @@ fun NavGraph(
             )
         }
 
+        // ═════════════════════════════════════════════════════════════════════
+        //  HIERARCHICAL ROUTES  —  uses NavHost default (no override needed)
+        // ═════════════════════════════════════════════════════════════════════
+
         composable(
             route = Screen.PlaylistDetail.route,
             arguments = listOf(
                 navArgument("playlistId") { type = NavType.LongType }
             )
+            // Uses default hierarchical transitions from NavHost
         ) {
             PlaylistDetailScreen(
                 playlistId = it.arguments?.getLong("playlistId") ?: 0L,
@@ -125,6 +137,7 @@ fun NavGraph(
             arguments = listOf(
                 navArgument("artistName") { type = NavType.StringType }
             )
+            // Uses default hierarchical transitions from NavHost
         ) {
             val encodedName = it.arguments?.getString("artistName") ?: ""
             val artistName = URLDecoder.decode(encodedName, "UTF-8")
@@ -135,13 +148,10 @@ fun NavGraph(
             )
         }
 
-        composable(route = Screen.Player.route) {
-            PlayerScreen(
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Search.route) {
+        composable(
+            route = Screen.Search.route
+            // Uses default hierarchical transitions from NavHost
+        ) {
             SearchScreen(
                 onNavigateToPlayer = onNavigateToPlayer,
                 onBackClick = { navController.popBackStack() }
@@ -155,10 +165,27 @@ fun NavGraph(
                     type = NavType.StringType
                 }
             )
+            // Uses default hierarchical transitions from NavHost
         ) {
             AlbumScreen(
                 albumId = it.arguments?.getString("albumId")?.toLongOrNull() ?: 0L,
                 onNavigateToPlayer = onNavigateToPlayer,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        //  PLAYER ROUTE  —  vertical slide up / down
+        // ═════════════════════════════════════════════════════════════════════
+
+        composable(
+            route = Screen.Player.route,
+            enterTransition  = { NavAnimations.playerEnter },
+            exitTransition   = { NavAnimations.playerPopExit },
+            popEnterTransition = { NavAnimations.playerPopEnterBehind },
+            popExitTransition  = { NavAnimations.playerPopExit }
+        ) {
+            PlayerScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
