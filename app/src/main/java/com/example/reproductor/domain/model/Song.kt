@@ -13,5 +13,6 @@ data class Song(
     val albumId: Long,
     val artistId: Long,
     val albumArt: String?,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val playCount: Int = 0
 )

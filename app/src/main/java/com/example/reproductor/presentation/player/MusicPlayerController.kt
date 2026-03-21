@@ -12,6 +12,7 @@ import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.service.MusicPlayerService
+import com.example.reproductor.domain.repository.MusicRepository
 import com.google.common.util.concurrent.MoreExecutors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +30,8 @@ import javax.inject.Singleton
 
 @Singleton
 class MusicPlayerController @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val musicRepository: MusicRepository
 ) {
     private var mediaController: MediaController? = null
     // Fix #10: SupervisorJob prevents one failure from cancelling the entire scope
@@ -93,6 +95,12 @@ class MusicPlayerController @Inject constructor(
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 updatePlayerState()
+                // Increment play count for the new track
+                mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
+                    coroutineScope.launch {
+                        musicRepository.incrementPlayCount(songId)
+                    }
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {

@@ -202,6 +202,18 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getMostPlayedSongs(limit: Int): Flow<List<Song>> {
+        return songDao.getMostPlayedSongs(limit)
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
+    }
+
+    override suspend fun incrementPlayCount(songId: Long) {
+        withContext(Dispatchers.IO) {
+            songDao.incrementPlayCount(songId)
+        }
+    }
+
     private suspend fun syncSongsIncrementally(newSongs: List<SongEntity>) {
         val currentSongs = songDao.getSongsSnapshot()
         val currentSongsById = currentSongs.associateBy { it.id }
@@ -210,9 +222,20 @@ class MusicRepositoryImpl @Inject constructor(
         val newSongIds = newSongsById.keys
 
         val removedSongIds = currentSongIds - newSongIds
-        val songsToUpsert = newSongs.filter { newSong ->
-            val currentSong = currentSongsById[newSong.id]
-            currentSong == null || currentSong != newSong
+        val songsToUpsert = newSongs.map { newSong ->
+            val existingSong = currentSongsById[newSong.id]
+            if (existingSong != null) {
+                // Preserve user-generated fields (playCount, isFavorite) from existing data
+                newSong.copy(
+                    playCount = existingSong.playCount,
+                    isFavorite = existingSong.isFavorite
+                )
+            } else {
+                newSong
+            }
+        }.filter { mergedSong ->
+            val currentSong = currentSongsById[mergedSong.id]
+            currentSong == null || currentSong != mergedSong
         }
 
         if (removedSongIds.isNotEmpty()) {

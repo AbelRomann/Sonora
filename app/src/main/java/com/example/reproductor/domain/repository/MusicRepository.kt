@@ -26,4 +26,7 @@ interface MusicRepository {
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long)
     suspend fun deletePlaylist(playlistId: Long)
     suspend fun moveSongInPlaylist(playlistId: Long, fromIndex: Int, toIndex: Int)
+
+    fun getMostPlayedSongs(limit: Int = 20): Flow<List<Song>>
+    suspend fun incrementPlayCount(songId: Long)
 }

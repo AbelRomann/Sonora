@@ -41,9 +41,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Playlist
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.ui.theme.TextMuted
@@ -69,7 +71,7 @@ import com.example.reproductor.ui.theme.TextMuted
 fun SongOptionsSheet(
     song: Song,
     playlists: List<Playlist>,
-    coverGradient: List<Color>,
+    coverGradient: List<Color>? = null,
     onDismiss: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
@@ -112,15 +114,29 @@ fun SongOptionsSheet(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Brush.linearGradient(coverGradient)),
+                        .background(
+                            if (coverGradient != null) Brush.linearGradient(coverGradient)
+                            else Brush.linearGradient(listOf(Color(0xFF1B2238), Color(0xFF1B2238)))
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.55f),
-                        modifier = Modifier.size(22.dp)
-                    )
+                    if (!song.albumArt.isNullOrBlank()) {
+                        AsyncImage(
+                            model = song.albumArt,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.55f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

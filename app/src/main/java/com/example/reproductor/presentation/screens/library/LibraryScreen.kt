@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,27 +36,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.library.LibraryFilter
 import com.example.reproductor.presentation.library.LibraryViewModel
 
-// Gradient palette for song covers (mirrors PlaylistDetailScreen)
-private val libraryCoverBrushes = listOf(
-    listOf(Color(0xFF7B61FF), Color(0xFFFF5F7E)),
-    listOf(Color(0xFF4FD5FF), Color(0xFF1A6AFF)),
-    listOf(Color(0xFF00C896), Color(0xFF4FD5FF)),
-    listOf(Color(0xFFFFCC4F), Color(0xFFFF6B4A)),
-    listOf(Color(0xFFFF73C2), Color(0xFF9C7BFF)),
-    listOf(Color(0xFF4FA0FF), Color(0xFF00C896)),
-)
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -126,8 +120,25 @@ fun LibraryScreen(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(Brush.linearGradient(libraryCoverBrushes[index % libraryCoverBrushes.size]))
-                )
+                        .background(Color(0xFF171722)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!song.albumArt.isNullOrBlank()) {
+                        AsyncImage(
+                            model = song.albumArt,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color(0xFF6B6B85),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
                     Text(song.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     Text(song.artist, color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -156,7 +167,7 @@ fun LibraryScreen(
         SongOptionsSheet(
             song = song,
             playlists = playlists,
-            coverGradient = libraryCoverBrushes[songIndex % libraryCoverBrushes.size],
+            coverGradient = null,
             onDismiss = { selectedSong = null },
             onPlayNext = {
                 viewModel.playNext(song)

@@ -49,4 +49,10 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY dateAdded DESC, id DESC")
     fun getFavoriteSongs(): Flow<List<SongEntity>>
+
+    @Query("UPDATE songs SET playCount = playCount + 1 WHERE id = :songId")
+    suspend fun incrementPlayCount(songId: Long)
+
+    @Query("SELECT * FROM songs WHERE playCount > 0 ORDER BY playCount DESC LIMIT :limit")
+    fun getMostPlayedSongs(limit: Int): Flow<List<SongEntity>>
 }

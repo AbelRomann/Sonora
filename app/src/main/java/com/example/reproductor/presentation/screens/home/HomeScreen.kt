@@ -64,8 +64,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.presentation.components.MostPlayedSection
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
+import com.example.reproductor.presentation.components.toMostPlayedTrack
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.library.LibraryViewModel
 import com.example.reproductor.presentation.player.PlayerViewModel
@@ -94,6 +96,11 @@ fun HomeScreen(
     val repeatMode by playerViewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffleModeEnabled by playerViewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
+
+    val mostPlayedTracks = remember(mostPlayedSongs) {
+        mostPlayedSongs.map { it.toMostPlayedTrack() }
+    }
 
     var showQueueSheet by remember { mutableStateOf(false) }
     val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -315,6 +322,21 @@ fun HomeScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+        }
+
+        // ── Block 2.5: Most Played Section ──
+        if (mostPlayedTracks.isNotEmpty()) {
+            item {
+                MostPlayedSection(
+                    tracks = mostPlayedTracks,
+                    onItemClick = { songId ->
+                        songs.find { it.id == songId }?.let { song ->
+                            onSongClick(song)
+                        }
+                    }
+                )
+                Spacer(Modifier.height(24.dp))
+            }
         }
 
         // ── Block 3: Recents Header ──
