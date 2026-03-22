@@ -12,6 +12,7 @@ import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.service.MusicPlayerService
+import com.example.reproductor.util.AudioFadeManager
 import com.example.reproductor.domain.repository.MusicRepository
 import com.google.common.util.concurrent.MoreExecutors
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -37,6 +38,7 @@ class MusicPlayerController @Inject constructor(
     // Fix #10: SupervisorJob prevents one failure from cancelling the entire scope
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressUpdateJob: Job? = null
+    private val audioFadeManager = AudioFadeManager(coroutineScope)
 
     // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
     private val _playerState = MutableStateFlow(PlayerState())
@@ -274,11 +276,11 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun play() {
-        mediaController?.play()
+        mediaController?.let { audioFadeManager.fadeInAndPlay(it) }
     }
 
     fun pause() {
-        mediaController?.pause()
+        mediaController?.let { audioFadeManager.fadeOutAndPause(it) }
     }
 
     fun seekTo(position: Long) {
@@ -312,6 +314,7 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun release() {
+        audioFadeManager.cancelFade()
         progressUpdateJob?.cancel()
         mediaController?.release()
         mediaController = null
