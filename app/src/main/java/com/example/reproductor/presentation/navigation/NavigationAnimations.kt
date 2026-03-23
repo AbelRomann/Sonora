@@ -10,132 +10,138 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.navigation.NavBackStackEntry
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation Animation Specs
 //
-// Each navigation category has its own animation style:
-//   1. Top-level   – lightweight horizontal slide (peer sections)
-//   2. Hierarchical – deeper slide left/right (drill in/out)
-//   3. Player       – vertical slide up/down  (expand/collapse)
-//
-// Bottom sheets (Queue, SongOptions) use ModalBottomSheet and need no custom
-// transition — they already slide up from the bottom automatically.
+// Three animation categories:
+//   1. Top-level   – direction-aware horizontal slide (peer tabs)
+//   2. Hierarchical – full-width slide left/right (push into / pop out of detail)
+//   3. Player       – vertical slide up/down (expand/collapse)
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Tab order defines left-to-right visual position in the bottom nav bar.
+internal val TAB_ORDER = listOf(
+    Screen.Home.route,
+    Screen.Library.route,
+    Screen.Playlists.route,
+    Screen.Artists.route,
+)
+
+/**
+ * Returns true if [target] is visually to the RIGHT of [initial] in the tab bar.
+ * Forward (right) → new screen enters from the right.
+ * Backward (left) → new screen enters from the left.
+ */
+fun isForwardTabNavigation(initial: NavBackStackEntry?, target: NavBackStackEntry?): Boolean {
+    val from = TAB_ORDER.indexOf(initial?.destination?.route)
+    val to   = TAB_ORDER.indexOf(target?.destination?.route)
+    // If either route is not in the tab list (e.g. a detail screen), default to forward.
+    return to >= from
+}
 
 object NavAnimations {
 
     // ── Durations ────────────────────────────────────────────────────────────
-    private const val TOP_LEVEL_DURATION   = 300
-    private const val HIERARCHICAL_DURATION = 300
-    private const val HIERARCHICAL_POP_DURATION = 250
-    private const val PLAYER_DURATION       = 400
-    private const val PLAYER_EXIT_DURATION  = 300
+    private const val TOP_LEVEL_DURATION        = 280
+    private const val HIERARCHICAL_DURATION     = 320
+    private const val HIERARCHICAL_POP_DURATION = 280
+    private const val PLAYER_DURATION           = 400
+    private const val PLAYER_EXIT_DURATION      = 300
 
     private val defaultEasing = FastOutSlowInEasing
 
     // ═══════════════════════════════════════════════════════════════════════
     //  1. Top-level navigation  (Home ↔ Library ↔ Playlists ↔ Artists)
-    //     Lightweight horizontal slide at 25% width, subtle fade.
+    //     Direction-aware: the slide direction mirrors tab position.
+    //
+    //  Going RIGHT  (e.g. Library → Playlists):
+    //    new  → enters from RIGHT (+30%)
+    //    old  → exits  to  LEFT  (-30%)
+    //
+    //  Going LEFT   (e.g. Playlists → Library):
+    //    new  → enters from LEFT  (-30%)
+    //    old  → exits  to  RIGHT (+30%)
     // ═══════════════════════════════════════════════════════════════════════
 
-    /** Screen entering from the right (navigating forward/right in tab order). */
-    val topLevelEnter: EnterTransition = slideInHorizontally(
-        initialOffsetX = { fullWidth -> (fullWidth * 0.25f).toInt() },
-        animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
-    ) + fadeIn(
-        animationSpec = tween((TOP_LEVEL_DURATION * 0.6f).toInt())
-    )
+    /** Direction-aware enter for a top-level tab screen. */
+    fun topLevelEnter(fromEntry: NavBackStackEntry?, toEntry: NavBackStackEntry?): EnterTransition {
+        val forward = isForwardTabNavigation(fromEntry, toEntry)
+        return slideInHorizontally(
+            initialOffsetX = { if (forward) (it * 0.30f).toInt() else -(it * 0.30f).toInt() },
+            animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
+        ) + fadeIn(animationSpec = tween((TOP_LEVEL_DURATION * 0.65f).toInt()))
+    }
 
-    /** Screen exiting to the left (the old screen slides slightly out). */
-    val topLevelExit: ExitTransition = slideOutHorizontally(
-        targetOffsetX = { fullWidth -> -(fullWidth * 0.15f).toInt() },
-        animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
-    ) + fadeOut(
-        animationSpec = tween((TOP_LEVEL_DURATION * 0.5f).toInt())
-    )
+    /** Direction-aware exit for a top-level tab screen (peer → peer). */
+    fun topLevelExit(fromEntry: NavBackStackEntry?, toEntry: NavBackStackEntry?): ExitTransition {
+        val forward = isForwardTabNavigation(fromEntry, toEntry)
+        return slideOutHorizontally(
+            targetOffsetX = { if (forward) -(it * 0.30f).toInt() else (it * 0.30f).toInt() },
+            animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
+        ) + fadeOut(animationSpec = tween((TOP_LEVEL_DURATION * 0.50f).toInt()))
+    }
 
-    /** Screen re-entering from the left (navigating back/left in tab order). */
-    val topLevelPopEnter: EnterTransition = slideInHorizontally(
-        initialOffsetX = { fullWidth -> -(fullWidth * 0.25f).toInt() },
-        animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
-    ) + fadeIn(
-        animationSpec = tween((TOP_LEVEL_DURATION * 0.6f).toInt())
-    )
+    // ── Static fallbacks (used in popExitTransition for top-level screens) ──
 
-    /** Screen exiting to the right when popped. */
+    /** Top-level screen exits to the right when popped (via popBackStack). */
     val topLevelPopExit: ExitTransition = slideOutHorizontally(
-        targetOffsetX = { fullWidth -> (fullWidth * 0.15f).toInt() },
+        targetOffsetX = { (it * 0.30f).toInt() },
         animationSpec = tween(TOP_LEVEL_DURATION, easing = defaultEasing)
-    ) + fadeOut(
-        animationSpec = tween((TOP_LEVEL_DURATION * 0.5f).toInt())
-    )
+    ) + fadeOut(animationSpec = tween((TOP_LEVEL_DURATION * 0.50f).toInt()))
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  2. Hierarchical navigation  (Library → Playlist → Song list, etc.)
-    //     Full-width slide from right. Feels like pushing onto a stack.
+    //  2. Hierarchical navigation  (any top-level → detail screen)
+    //
+    //  FORWARD  (push detail):
+    //    new  → enters from RIGHT (+100%)    [hierarchicalEnter]
+    //    old  → exits  to  LEFT  (-33%)      [hierarchicalExit]
+    //
+    //  BACK     (pop detail):
+    //    old  → exits  to  RIGHT (+100%)     [hierarchicalPopExit]
+    //    new  → enters from LEFT (-33%)      [hierarchicalPopEnter]
     // ═══════════════════════════════════════════════════════════════════════
 
     /** New detail screen slides in from the right. */
     val hierarchicalEnter: EnterTransition = slideInHorizontally(
-        initialOffsetX = { it },  // 100% width
+        initialOffsetX = { it },
         animationSpec = tween(HIERARCHICAL_DURATION, easing = defaultEasing)
-    ) + fadeIn(
-        animationSpec = tween((HIERARCHICAL_DURATION * 0.4f).toInt())
-    )
+    ) + fadeIn(animationSpec = tween((HIERARCHICAL_DURATION * 0.35f).toInt()))
 
-    /** Current screen slides slightly left as the detail pushes in. */
+    /** Parent screen retreats left as detail pushes in. */
     val hierarchicalExit: ExitTransition = slideOutHorizontally(
-        targetOffsetX = { -(it * 0.25f).toInt() },
+        targetOffsetX = { -(it / 3) },
         animationSpec = tween(HIERARCHICAL_DURATION, easing = defaultEasing)
-    ) + fadeOut(
-        animationSpec = tween((HIERARCHICAL_DURATION * 0.5f).toInt())
-    )
+    ) + fadeOut(animationSpec = tween((HIERARCHICAL_DURATION * 0.45f).toInt()))
 
-    /** On back: parent re-enters from the left. */
+    /** Parent screen re-enters from the left when back is pressed. */
     val hierarchicalPopEnter: EnterTransition = slideInHorizontally(
-        initialOffsetX = { -(it * 0.25f).toInt() },
+        initialOffsetX = { -(it / 3) },
         animationSpec = tween(HIERARCHICAL_POP_DURATION, easing = defaultEasing)
-    ) + fadeIn(
-        animationSpec = tween((HIERARCHICAL_POP_DURATION * 0.5f).toInt())
-    )
+    ) + fadeIn(animationSpec = tween((HIERARCHICAL_POP_DURATION * 0.45f).toInt()))
 
-    /** On back: detail exits to the right. */
+    /** Detail screen exits to the right when back is pressed. */
     val hierarchicalPopExit: ExitTransition = slideOutHorizontally(
-        targetOffsetX = { it },  // 100% width
+        targetOffsetX = { it },
         animationSpec = tween(HIERARCHICAL_POP_DURATION, easing = defaultEasing)
-    ) + fadeOut(
-        animationSpec = tween((HIERARCHICAL_POP_DURATION * 0.4f).toInt())
-    )
+    ) + fadeOut(animationSpec = tween((HIERARCHICAL_POP_DURATION * 0.35f).toInt()))
 
     // ═══════════════════════════════════════════════════════════════════════
     //  3. Player expand / collapse  (MiniPlayer ↔ Full Player)
-    //     Vertical slide-up. Smooth but not heavy.
     // ═══════════════════════════════════════════════════════════════════════
 
-    /** Player slides up from the bottom. */
     val playerEnter: EnterTransition = slideInVertically(
-        initialOffsetY = { it },  // starts off-screen at the bottom
+        initialOffsetY = { it },
         animationSpec = tween(PLAYER_DURATION, easing = defaultEasing)
-    ) + fadeIn(
-        animationSpec = tween((PLAYER_DURATION * 0.3f).toInt())
-    )
+    ) + fadeIn(animationSpec = tween((PLAYER_DURATION * 0.30f).toInt()))
 
-    /** Existing screen stays in place (no visible exit). */
-    val playerExitBehind: ExitTransition = fadeOut(
-        animationSpec = tween(1)   // instant, invisible behind the player
-    )
+    val playerExitBehind: ExitTransition = fadeOut(animationSpec = tween(1))
 
-    /** Player slides back down when going back. */
     val playerPopExit: ExitTransition = slideOutVertically(
-        targetOffsetY = { it },   // slides back to bottom
+        targetOffsetY = { it },
         animationSpec = tween(PLAYER_EXIT_DURATION, easing = defaultEasing)
-    ) + fadeOut(
-        animationSpec = tween((PLAYER_EXIT_DURATION * 0.4f).toInt())
-    )
+    ) + fadeOut(animationSpec = tween((PLAYER_EXIT_DURATION * 0.40f).toInt()))
 
-    /** Screen behind re-appears when player is dismissed. */
-    val playerPopEnterBehind: EnterTransition = fadeIn(
-        animationSpec = tween(1)  // instant re-appear
-    )
+    val playerPopEnterBehind: EnterTransition = fadeIn(animationSpec = tween(1))
 }

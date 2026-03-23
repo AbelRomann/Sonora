@@ -49,21 +49,31 @@ fun NavGraph(
         startDestination = Screen.Home.route,
         // ── Default transitions (hierarchical) ──────────────────────────────
         // Individual routes override these when needed (top-level, player).
-        enterTransition  = { NavAnimations.hierarchicalEnter },
-        exitTransition   = { NavAnimations.hierarchicalExit },
+        enterTransition    = { NavAnimations.hierarchicalEnter },
+        exitTransition     = { NavAnimations.hierarchicalExit },
         popEnterTransition = { NavAnimations.hierarchicalPopEnter },
         popExitTransition  = { NavAnimations.hierarchicalPopExit }
     ) {
 
         // ═════════════════════════════════════════════════════════════════════
-        //  TOP-LEVEL ROUTES  —  lightweight horizontal slide
+        //  TOP-LEVEL ROUTES  —  direction-aware slide between peer tabs,
+        //  plus hierarchical exit/popEnter when a detail child is pushed/popped.
+        //
+        //  The lambda receives `initialState` and `targetState` (NavBackStackEntry),
+        //  so we can compare their tab indices to determine slide direction.
         // ═════════════════════════════════════════════════════════════════════
 
         composable(
             route = Screen.Home.route,
-            enterTransition  = { NavAnimations.topLevelEnter },
-            exitTransition   = { NavAnimations.topLevelExit },
-            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            enterTransition    = { NavAnimations.topLevelEnter(initialState, targetState) },
+            exitTransition     = {
+                // If target is a peer tab → direction-aware; if child detail → hierarchical
+                if (TAB_ORDER.contains(targetState.destination?.route))
+                    NavAnimations.topLevelExit(initialState, targetState)
+                else
+                    NavAnimations.hierarchicalExit
+            },
+            popEnterTransition = { NavAnimations.hierarchicalPopEnter },
             popExitTransition  = { NavAnimations.topLevelPopExit }
         ) {
             HomeScreen(
@@ -74,9 +84,14 @@ fun NavGraph(
 
         composable(
             route = Screen.Library.route,
-            enterTransition  = { NavAnimations.topLevelEnter },
-            exitTransition   = { NavAnimations.topLevelExit },
-            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            enterTransition    = { NavAnimations.topLevelEnter(initialState, targetState) },
+            exitTransition     = {
+                if (TAB_ORDER.contains(targetState.destination?.route))
+                    NavAnimations.topLevelExit(initialState, targetState)
+                else
+                    NavAnimations.hierarchicalExit
+            },
+            popEnterTransition = { NavAnimations.hierarchicalPopEnter },
             popExitTransition  = { NavAnimations.topLevelPopExit }
         ) {
             LibraryScreen(
@@ -87,9 +102,14 @@ fun NavGraph(
 
         composable(
             route = Screen.Playlists.route,
-            enterTransition  = { NavAnimations.topLevelEnter },
-            exitTransition   = { NavAnimations.topLevelExit },
-            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            enterTransition    = { NavAnimations.topLevelEnter(initialState, targetState) },
+            exitTransition     = {
+                if (TAB_ORDER.contains(targetState.destination?.route))
+                    NavAnimations.topLevelExit(initialState, targetState)
+                else
+                    NavAnimations.hierarchicalExit
+            },
+            popEnterTransition = { NavAnimations.hierarchicalPopEnter },
             popExitTransition  = { NavAnimations.topLevelPopExit }
         ) {
             PlaylistsScreen(
@@ -101,9 +121,14 @@ fun NavGraph(
 
         composable(
             route = Screen.Artists.route,
-            enterTransition  = { NavAnimations.topLevelEnter },
-            exitTransition   = { NavAnimations.topLevelExit },
-            popEnterTransition = { NavAnimations.topLevelPopEnter },
+            enterTransition    = { NavAnimations.topLevelEnter(initialState, targetState) },
+            exitTransition     = {
+                if (TAB_ORDER.contains(targetState.destination?.route))
+                    NavAnimations.topLevelExit(initialState, targetState)
+                else
+                    NavAnimations.hierarchicalExit
+            },
+            popEnterTransition = { NavAnimations.hierarchicalPopEnter },
             popExitTransition  = { NavAnimations.topLevelPopExit }
         ) {
             ArtistsScreen(
