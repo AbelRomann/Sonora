@@ -76,6 +76,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -84,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.library.LibraryViewModel
@@ -557,20 +559,32 @@ private fun PlaylistSongRow(
             textAlign = TextAlign.End
         )
 
-        // Gradient cover
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Brush.linearGradient(gradient)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.MusicNote,
+        // Cover
+        if (!song.albumArt.isNullOrBlank()) {
+            AsyncImage(
+                model = song.albumArt,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.55f),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            // Gradient cover fallback
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(gradient)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         // Title + artist
@@ -881,16 +895,29 @@ private fun AddSongsSheet(
                             }
                         }
 
-                        // Gradient cover
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Brush.linearGradient(coverBrushes[index % coverBrushes.size]))
-                                .alpha(if (isSelected) 1f else 0.75f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                        // Cover
+                        if (!song.albumArt.isNullOrBlank()) {
+                            AsyncImage(
+                                model = song.albumArt,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .alpha(if (isSelected) 1f else 0.75f),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            // Gradient cover fallback
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Brush.linearGradient(coverBrushes[index % coverBrushes.size]))
+                                    .alpha(if (isSelected) 1f else 0.75f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                            }
                         }
 
                         // Title + artist
