@@ -27,9 +27,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,14 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +76,8 @@ import com.example.reproductor.ui.theme.PlayerBackground
 import com.example.reproductor.ui.theme.TextMuted
 import com.example.reproductor.ui.theme.TextSubtle
 import kotlinx.coroutines.launch
+
+// No longer importing interaction source — press animation simplified to alpha
 
 // ── Palette for playlist card gradients ────────────────────────────────────────
 private val cardGradients = listOf(
@@ -125,56 +126,44 @@ fun PlaylistsScreen(
             .fillMaxSize()
             .background(PlayerBackground)
     ) {
-        LazyColumn(
-            contentPadding = PaddingValues(bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars)
         ) {
-            // ── Header ──────────────────────────────────────────────────────
-            item {
+            // ── Header (full-width span) ─────────────────────────────────────
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 PlaylistsHeader(
                     playlistCount = playlists.size,
                     onCreateClick = { showCreateDialog = true }
                 )
             }
 
-            // ── Grid (all playlists) ─────────────────────────────────
-            if (playlists.isNotEmpty()) {
-                item {
-                    Spacer(Modifier.height(8.dp))
-                    val rowCount = (playlists.size + 1) / 2
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .height((rowCount * 230 + (rowCount - 1) * 12).dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        userScrollEnabled = false
-                    ) {
-                        items(playlists, key = { it.id }) { playlist ->
-                            val index = playlists.indexOf(playlist) % cardGradients.size
-                            PlaylistGridCard(
-                                playlist = playlist,
-                                gradient = cardGradients[index % cardGradients.size],
-                                accent = cardAccents[index % cardAccents.size],
-                                iconVector = playlistIcons[index % playlistIcons.size],
-                                onClick = { onNavigateToPlaylistDetail(playlist.id) },
-                                onLongClick = { longPressedPlaylist = playlist }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── Empty state ─────────────────────────────────────────────────
+            // ── Empty state (full-width span) ────────────────────────────────
             if (playlists.isEmpty()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyPlaylistsState(onCreateClick = { showCreateDialog = true })
                 }
+            } else {
+                // ── Grid cards — index from itemsIndexed (no indexOf O(n²)) ──
+                itemsIndexed(
+                    items = playlists,
+                    key = { _, p -> p.id }
+                ) { index, playlist ->
+                    PlaylistGridCard(
+                        playlist = playlist,
+                        gradient = cardGradients[index % cardGradients.size],
+                        accent = cardAccents[index % cardAccents.size],
+                        iconVector = playlistIcons[index % playlistIcons.size],
+                        onClick = { onNavigateToPlaylistDetail(playlist.id) },
+                        onLongClick = { longPressedPlaylist = playlist }
+                    )
+                }
             }
-
         }
 
         // ── FAB ──────────────────────────────────────────────────────────────
@@ -189,12 +178,6 @@ fun PlaylistsScreen(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .shadow(
-                        elevation = 16.dp,
-                        shape = CircleShape,
-                        ambientColor = AccentLime.copy(alpha = 0.5f),
-                        spotColor = AccentLime.copy(alpha = 0.5f)
-                    )
                     .clip(CircleShape)
                     .background(AccentLime)
                     .clickable { showCreateDialog = true },
@@ -550,37 +533,29 @@ private fun PlaylistGridCard(
     onLongClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
-        ),
-        label = "cardScale"
-    )
+    // Lightweight press: just alpha, no graphicsLayer scale (scale+shadow = expensive)
+    var isPressed by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(22.dp),
-                ambientColor = accent.copy(alpha = 0.25f),
-                spotColor = accent.copy(alpha = 0.25f)
-            )
             .clip(RoundedCornerShape(22.dp))
             .background(Color(0xFF0D1120))
+            // 1dp accent-tinted border replaces the custom-colored shadow()
+            .border(
+                width = 1.dp,
+                color = accent.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(22.dp)
+            )
             .combinedClickable(
-                interactionSource = interactionSource,
                 indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLongClick()
                 }
             )
+            .graphicsLayer { alpha = if (isPressed) 0.75f else 1f }
     ) {
         Column {
             // ── Cover Area ────────────────────────────────────────────
@@ -588,36 +563,21 @@ private fun PlaylistGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    // Single linearGradient — radial glow blob removed
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(
-                                gradient[0],
-                                gradient[0].copy(alpha = 0.7f),
-                                gradient.last().copy(alpha = 0.9f),
-                                gradient.last()
-                            ),
+                            colors = listOf(gradient[0], gradient.last()),
                             start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                            end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                            end = androidx.compose.ui.geometry.Offset(
+                                Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY
+                            )
                         )
-                    )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                // Large glow blob behind icon
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .align(Alignment.Center)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(accent.copy(alpha = 0.35f), Color.Transparent)
-                            ),
-                            shape = CircleShape
-                        )
-                )
-
                 // Icon on frosted pill background
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
                         .size(64.dp)
                         .background(
                             Color.Black.copy(alpha = 0.22f),
@@ -632,19 +592,7 @@ private fun PlaylistGridCard(
                         modifier = Modifier.size(34.dp)
                     )
                 }
-
-                // Bottom gradient text overlay for readability
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color(0xFF0D1120).copy(alpha = 0.85f))
-                            )
-                        )
-                )
+                // verticalGradient text overlay removed — saves one blend pass per card
             }
 
             // ── Info Area ─────────────────────────────────────────────

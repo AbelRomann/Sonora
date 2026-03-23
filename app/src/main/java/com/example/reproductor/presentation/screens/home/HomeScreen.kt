@@ -51,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -273,12 +272,6 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
-                                .shadow(
-                                    elevation = 12.dp,
-                                    shape = CircleShape,
-                                    ambientColor = AccentLime.copy(alpha = 0.4f),
-                                    spotColor = AccentLime.copy(alpha = 0.4f)
-                                )
                                 .clip(CircleShape)
                                 .background(AccentLime)
                                 .clickable { playerViewModel.togglePlayPause() },

@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -148,33 +147,14 @@ private fun MostPlayedItem(
         label = "pressScale"
     )
 
-    // Remember heavy objects
     val containerShape = remember { RoundedCornerShape(20.dp) }
-    val containerGradient = remember {
-        Brush.verticalGradient(
-            colors = listOf(MostPlayedCardBg, Color(0xFF141420))
-        )
-    }
-    val artworkOverlayGradient = remember {
-        Brush.verticalGradient(
-            colors = listOf(Color.Transparent, Color(0x66000000)),
-            startY = 80f,
-            endY = 260f
-        )
-    }
 
     Column(
         modifier = modifier
             .width(148.dp)
             .scale(scale)
-            .shadow(
-                elevation = 8.dp,
-                shape = containerShape,
-                ambientColor = Color.Black.copy(alpha = 0.5f),
-                spotColor = Color.Black.copy(alpha = 0.3f)
-            )
             .clip(containerShape)
-            .background(containerGradient)
+            .background(MostPlayedCardBg)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
@@ -210,19 +190,12 @@ private fun MostPlayedItem(
                 contentScale = ContentScale.Crop
             )
 
-            // Gradient overlay for depth
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(artworkOverlayGradient)
-            )
+            // Gradient overlay — removed (saves one GPU blend pass per card)
 
             // Play button overlay
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .shadow(4.dp, CircleShape)
                     .clip(CircleShape)
                     .background(PlayButtonBg),
                 contentAlignment = Alignment.Center

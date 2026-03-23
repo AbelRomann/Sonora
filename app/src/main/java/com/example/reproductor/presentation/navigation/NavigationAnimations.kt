@@ -44,11 +44,11 @@ fun isForwardTabNavigation(initial: NavBackStackEntry?, target: NavBackStackEntr
 object NavAnimations {
 
     // ── Durations ────────────────────────────────────────────────────────────
-    private const val TOP_LEVEL_DURATION        = 280
-    private const val HIERARCHICAL_DURATION     = 320
-    private const val HIERARCHICAL_POP_DURATION = 280
-    private const val PLAYER_DURATION           = 400
-    private const val PLAYER_EXIT_DURATION      = 300
+    private const val TOP_LEVEL_DURATION        = 180
+    private const val HIERARCHICAL_DURATION     = 200
+    private const val HIERARCHICAL_POP_DURATION = 180
+    private const val PLAYER_DURATION           = 280
+    private const val PLAYER_EXIT_DURATION      = 220
 
     private val defaultEasing = FastOutSlowInEasing
 

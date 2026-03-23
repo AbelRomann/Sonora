@@ -326,22 +326,8 @@ private fun PlaylistHeader(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to Color(0xFF2A1050),
-                            0.6f to Color(0xFF0F1A35),
-                            1.0f to PlayerBackground
-                        )
+                        listOf(Color(0xFF1A0A38), PlayerBackground)
                     )
-                )
-        )
-        // Decorative radial glow
-        Box(
-            modifier = Modifier
-                .size(220.dp)
-                .align(Alignment.TopEnd)
-                .background(
-                    Brush.radialGradient(listOf(Color(0xFF7B61FF).copy(alpha = 0.25f), Color.Transparent)),
-                    shape = CircleShape
                 )
         )
 
