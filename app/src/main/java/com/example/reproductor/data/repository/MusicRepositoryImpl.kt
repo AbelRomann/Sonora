@@ -39,7 +39,7 @@ class MusicRepositoryImpl @Inject constructor(
 
     private val PREFS_NAME = "music_cache"
     private val KEY_LAST_SCAN = "last_scan_timestamp"
-    private val CACHE_VALIDITY_MS = 3600000L
+    private val CACHE_VALIDITY_MS = 300_000L  // 5 minutos — detecta canciones nuevas rápido
 
     override fun getAllSongs(): Flow<List<Song>> {
         return songDao.getAllSongs()

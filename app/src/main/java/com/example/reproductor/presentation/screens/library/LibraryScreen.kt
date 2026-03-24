@@ -24,10 +24,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +53,7 @@ import com.example.reproductor.presentation.library.LibraryViewModel
 
 
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     onNavigateToPlayer: () -> Unit,
@@ -61,17 +63,24 @@ fun LibraryScreen(
     val filteredSongs by viewModel.filteredSongs.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     var selectedSong by remember { mutableStateOf<Song?>(null) }
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = isLoading,
+        onRefresh = { viewModel.refreshMusic() },
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF060609))
             .windowInsetsPadding(WindowInsets.systemBars)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
         item {
             Spacer(Modifier.height(12.dp))
             Text("Biblioteca", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
@@ -158,8 +167,9 @@ fun LibraryScreen(
             }
         }
 
-        item { Spacer(Modifier.height(90.dp)) }
-    }
+            item { Spacer(Modifier.height(90.dp)) }
+        }
+    } // end PullToRefreshBox
 
     // Song Options Sheet
     selectedSong?.let { song ->
