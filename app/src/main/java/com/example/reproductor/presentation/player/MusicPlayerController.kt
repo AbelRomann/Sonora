@@ -40,6 +40,13 @@ class MusicPlayerController @Inject constructor(
     private var progressUpdateJob: Job? = null
     private val audioFadeManager = AudioFadeManager(coroutineScope)
 
+    // ── Play-count threshold (30 s) ──────────────────────────────────────────
+    private val minListenMs = 30_000L          // require 30 seconds of listening
+    private var currentListenSongId: Long? = null
+    private var listenStartMs: Long? = null    // wall-clock ms when playback started
+    private var listenedMs: Long = 0L          // accumulated listening time for current song
+    private var playCountCounted: Boolean = false // true once count has been registered
+
     // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
@@ -89,19 +96,30 @@ class MusicPlayerController @Inject constructor(
                 updatePlayerState()
                 if (isPlaying) {
                     startProgressUpdates()
+                    recordListenStart()   // player resumed — start the clock
                 } else {
                     stopProgressUpdates()
-                    updateProgress() // one final update to sync position
+                    updateProgress()      // one final update to sync position
+                    pauseListenClock()    // player paused — accumulate elapsed time
                 }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Commit any accumulated time for the PREVIOUS song before resetting
+                commitListenTimeIfNeeded()
+
+                // Reset counters for the new song
+                val newSongId = mediaItem?.mediaId?.toLongOrNull()
+                currentListenSongId = newSongId
+                listenStartMs = null
+                listenedMs = 0L
+                playCountCounted = false
+
                 updatePlayerState()
-                // Increment play count for the new track
-                mediaItem?.mediaId?.toLongOrNull()?.let { songId ->
-                    coroutineScope.launch {
-                        musicRepository.incrementPlayCount(songId)
-                    }
+
+                // Start the listen clock immediately if already playing
+                if (mediaController?.isPlaying == true) {
+                    recordListenStart()
                 }
             }
 
@@ -132,6 +150,38 @@ class MusicPlayerController @Inject constructor(
     private fun stopProgressUpdates() {
         progressUpdateJob?.cancel()
         progressUpdateJob = null
+    }
+
+    // ── Listen-time tracking helpers ─────────────────────────────────────────
+
+    /** Called when playback starts or resumes. Saves the wall-clock start time. */
+    private fun recordListenStart() {
+        if (listenStartMs == null) {
+            listenStartMs = System.currentTimeMillis()
+        }
+    }
+
+    /** Called when playback pauses. Adds elapsed time to the accumulator. */
+    private fun pauseListenClock() {
+        listenStartMs?.let { start ->
+            listenedMs += System.currentTimeMillis() - start
+            listenStartMs = null
+        }
+    }
+
+    /**
+     * Adds any in-progress listening time and, if the total >= 30 s and the
+     * count hasn't been registered yet, increments the play count.
+     */
+    private fun commitListenTimeIfNeeded() {
+        pauseListenClock() // accumulate any running segment
+        val songId = currentListenSongId ?: return
+        if (!playCountCounted && listenedMs >= minListenMs) {
+            playCountCounted = true
+            coroutineScope.launch {
+                musicRepository.incrementPlayCount(songId)
+            }
+        }
     }
 
     // Fix #4: Only emit when values actually change to avoid unnecessary recomposition
@@ -314,6 +364,7 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun release() {
+        commitListenTimeIfNeeded() // flush any pending listen time on release
         audioFadeManager.cancelFade()
         progressUpdateJob?.cancel()
         mediaController?.release()

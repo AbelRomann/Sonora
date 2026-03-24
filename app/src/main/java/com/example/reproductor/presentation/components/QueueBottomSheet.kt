@@ -258,7 +258,7 @@ private fun DraggableQueueCard(
     isActive: Boolean,
     isDragging: Boolean,
     isDimmed: Boolean,
-    dragHandleModifier: Modifier,
+    dragHandleModifier: Modifier,  // applied ONLY to the handle icon, not the whole card
     onTap: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -367,7 +367,6 @@ private fun DraggableQueueCard(
                             offsetX = (offsetX + dragAmount).coerceAtLeast(DISMISS_THRESHOLD - 80f)
                     }
                 }
-                .then(dragHandleModifier)
                 .clickable(enabled = !isDragging) { onTap() }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -423,12 +422,15 @@ private fun DraggableQueueCard(
 
             Spacer(Modifier.width(8.dp))
 
-            // Drag handle — highlighted when dragging
+            // Drag handle — reordering only activates when the user grabs this icon
             Icon(
                 Icons.Default.DragHandle,
                 contentDescription = "Reordenar",
                 tint = if (isDragging) QAccent.copy(alpha = 0.85f) else QMuted.copy(alpha = 0.55f),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .size(28.dp)          // slightly larger tap target
+                    .padding(4.dp)
+                    .then(dragHandleModifier)   // drag only from here
             )
         }
     }

@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -369,6 +370,7 @@ fun MarqueeText(
                     Box(
                         modifier = Modifier
                             .width(with(LocalDensity.current) { finalWidth.toDp() })
+                            .clipToBounds()           // prevent text from bleeding over album art
                             .drawWithContent {
                                 // Edge fade masks
                                 drawContent()

@@ -1,15 +1,33 @@
+# ── Build outputs ──────────────────────────────────────────────────────────────
+build/
+**/build/
+
+# ── Gradle ─────────────────────────────────────────────────────────────────────
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# ── Android Studio / IntelliJ ──────────────────────────────────────────────────
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.idea/
+.externalNativeBuild/
+.cxx/
+
+# ── Local config (SDK path, machine-specific) ──────────────────────────────────
 local.properties
+keystore.properties
+
+# ── Signing keystores — NUNCA subir al repo ────────────────────────────────────
+*.jks
+*.keystore
+
+# ── Captures / profiling ───────────────────────────────────────────────────────
+/captures
+*.hprof
+lint-results*
+
+# ── OS junk ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
