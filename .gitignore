@@ -2,6 +2,9 @@
 build/
 **/build/
 
+# ── Log / output text files ────────────────────────────────────────────────────
+*.txt
+
 # ── Gradle ─────────────────────────────────────────────────────────────────────
 .gradle/
 gradle/wrapper/gradle-wrapper.jar
