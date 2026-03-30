@@ -26,6 +26,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -46,6 +49,7 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -131,7 +135,10 @@ fun PlaylistDetailScreen(
     // Total duration
     val totalDurationMs = remember(playlistSongs) { playlistSongs.sumOf { it.duration } }
 
+    val listState = rememberLazyListState()
+
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(PlayerBackground)
@@ -153,6 +160,14 @@ fun PlaylistDetailScreen(
                 },
                 onShuffleClick = {
                     viewModel.playSongs(playlistSongs.shuffled(), 0)
+                    onNavigateToPlayer()
+                },
+                onSkipToFirst = {
+                    viewModel.playSongs(playlistSongs, 0)
+                    onNavigateToPlayer()
+                },
+                onSkipToLast = {
+                    viewModel.playSongs(playlistSongs, playlistSongs.lastIndex.coerceAtLeast(0))
                     onNavigateToPlayer()
                 }
             )
@@ -178,17 +193,64 @@ fun PlaylistDetailScreen(
                         color = TextMuted,
                         style = MaterialTheme.typography.labelMedium
                     )
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50.dp))
-                            .background(Color(0xFF1B2238))
-                            .clickable { showAddSheet = true }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = AccentLime, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Añadir", color = AccentLime, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                        // Scroll to top
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF1B2238))
+                                .border(1.dp, Color(0xFF2D3A55), CircleShape)
+                                .clickable {
+                                    scope.launch { listState.scrollToItem(0) }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Ir al inicio",
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        // Scroll to bottom
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF1B2238))
+                                .border(1.dp, Color(0xFF2D3A55), CircleShape)
+                                .clickable {
+                                    scope.launch {
+                                        // +2 accounts for the header item and the add-row itself
+                                        listState.scrollToItem(playlistSongs.size + 2)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Ir al final",
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        // Añadir chip
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50.dp))
+                                .background(Color(0xFF1B2238))
+                                .clickable { showAddSheet = true }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = AccentLime, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Añadir", color = AccentLime, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -313,7 +375,9 @@ private fun PlaylistHeader(
     onMoreClick: () -> Unit,
     canPlay: Boolean,
     onPlayClick: () -> Unit,
-    onShuffleClick: () -> Unit
+    onShuffleClick: () -> Unit,
+    onSkipToFirst: () -> Unit,
+    onSkipToLast: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -438,6 +502,18 @@ private fun PlaylistHeader(
             // Action buttons
             if (canPlay) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Skip to first
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1B2238))
+                            .border(1.dp, Color(0xFF2D3A55), CircleShape)
+                            .clickable(onClick = onSkipToFirst),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.SkipPrevious, contentDescription = "Primera canción", tint = TextSubtle, modifier = Modifier.size(22.dp))
+                    }
                     // Play (primary / dominant)
                     Box(
                         modifier = Modifier
@@ -466,16 +542,17 @@ private fun PlaylistHeader(
                     ) {
                         Icon(Icons.Default.Shuffle, contentDescription = "Aleatorio", tint = TextSubtle, modifier = Modifier.size(20.dp))
                     }
-                    // Edit (secondary)
+                    // Skip to last
                     Box(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF1B2238))
-                            .border(1.dp, Color(0xFF2D3A55), CircleShape),
+                            .border(1.dp, Color(0xFF2D3A55), CircleShape)
+                            .clickable(onClick = onSkipToLast),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = TextSubtle, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.SkipNext, contentDescription = "Última canción", tint = TextSubtle, modifier = Modifier.size(22.dp))
                     }
                 }
             } else {
