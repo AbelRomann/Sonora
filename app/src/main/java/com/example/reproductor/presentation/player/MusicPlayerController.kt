@@ -46,6 +46,9 @@ class MusicPlayerController @Inject constructor(
     private var listenStartMs: Long? = null    // wall-clock ms when playback started
     private var listenedMs: Long = 0L          // accumulated listening time for current song
     private var playCountCounted: Boolean = false // true once count has been registered
+    // Guard to prevent double-commit when both onPositionDiscontinuity and
+    // onMediaItemTransition fire for the same automatic loop event.
+    private var lastAutoTransitionHandledMs: Long = 0L
 
     // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
     private val _playerState = MutableStateFlow(PlayerState())
@@ -120,6 +123,33 @@ class MusicPlayerController @Inject constructor(
                 // Start the listen clock immediately if already playing
                 if (mediaController?.isPlaying == true) {
                     recordListenStart()
+                }
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                // DISCONTINUITY_REASON_AUTO_TRANSITION fires when a song ends and
+                // loops (REPEAT_MODE_ONE) or moves to the next item (REPEAT_MODE_ALL).
+                // onMediaItemTransition may or may not also fire for the same event,
+                // so we use a 500 ms guard to avoid double-committing.
+                if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastAutoTransitionHandledMs > 500L) {
+                        lastAutoTransitionHandledMs = now
+                        commitListenTimeIfNeeded()
+                        // Reset counters for the new playback cycle of the same song
+                        val newSongId = mediaController?.currentMediaItem?.mediaId?.toLongOrNull()
+                        currentListenSongId = newSongId
+                        listenStartMs = null
+                        listenedMs = 0L
+                        playCountCounted = false
+                        if (mediaController?.isPlaying == true) {
+                            recordListenStart()
+                        }
+                    }
                 }
             }
 
