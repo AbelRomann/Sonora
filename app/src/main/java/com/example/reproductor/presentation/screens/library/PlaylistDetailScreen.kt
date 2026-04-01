@@ -135,6 +135,20 @@ fun PlaylistDetailScreen(
     // Total duration
     val totalDurationMs = remember(playlistSongs) { playlistSongs.sumOf { it.duration } }
 
+    // ── In-playlist search ───────────────────────────────────────────────────────
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredSongs by remember(searchQuery, playlistSongs) {
+        derivedStateOf {
+            if (searchQuery.isBlank()) playlistSongs
+            else playlistSongs.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.artist.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+    val keyboard = LocalSoftwareKeyboardController.current
+
     val listState = rememberLazyListState()
 
     LazyColumn(
@@ -154,6 +168,14 @@ fun PlaylistDetailScreen(
                 onAddClick = { showAddSheet = true },
                 onMoreClick = { showPlaylistOptions = true },
                 canPlay = !isEmpty,
+                isSearchActive = isSearchActive,
+                onSearchClick = {
+                    isSearchActive = !isSearchActive
+                    if (!isSearchActive) {
+                        searchQuery = ""
+                        keyboard?.hide()
+                    }
+                },
                 onPlayClick = {
                     viewModel.playSongs(playlistSongs, 0)
                     onNavigateToPlayer()
@@ -171,6 +193,99 @@ fun PlaylistDetailScreen(
                     onNavigateToPlayer()
                 }
             )
+        }
+
+        // ── Inline search bar (appears right below header when active) ────────
+        if (isSearchActive) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp)),
+                        placeholder = {
+                            Text(
+                                "Buscar en esta playlist...",
+                                color = TextMuted,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = AccentLime.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Limpiar",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFF1A2236),
+                            unfocusedContainerColor = Color(0xFF1A2236),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = AccentLime,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+
+                // No results placeholder
+                if (searchQuery.isNotBlank() && filteredSongs.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = TextMuted.copy(alpha = 0.35f),
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Text(
+                            text = "Sin resultados para \"$searchQuery\"",
+                            color = TextMuted.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Esta canción no está en la playlist",
+                            color = TextMuted.copy(alpha = 0.4f),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
 
         // ── Empty state ──────────────────────────────────────────────────────
@@ -259,16 +374,17 @@ fun PlaylistDetailScreen(
 
             // ── Song rows ────────────────────────────────────────────────────
             itemsIndexed(
-                items = playlistSongs,
+                items = filteredSongs,
                 key = { _, song -> song.id }
             ) { index, song ->
                 PlaylistSongRow(
                     song = song,
                     index = index,
                     gradient = coverBrushes[index % coverBrushes.size],
-                    isLast = index == playlistSongs.lastIndex,
+                    isLast = index == filteredSongs.lastIndex,
                     onPlay = {
-                        viewModel.playSongs(playlistSongs, index)
+                        val originalIndex = playlistSongs.indexOf(song).coerceAtLeast(0)
+                        viewModel.playSongs(playlistSongs, originalIndex)
                         onNavigateToPlayer()
                     },
                     onMoreClick = { selectedSongForOptions = song }
@@ -374,6 +490,8 @@ private fun PlaylistHeader(
     onAddClick: () -> Unit,
     onMoreClick: () -> Unit,
     canPlay: Boolean,
+    isSearchActive: Boolean,
+    onSearchClick: () -> Unit,
     onPlayClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onSkipToFirst: () -> Unit,
@@ -431,15 +549,44 @@ private fun PlaylistHeader(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .clickable(onClick = onMoreClick),
-                    contentAlignment = Alignment.Center
+                // Right side: MoreVert stacked above Search
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable(onClick = onMoreClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSearchActive) AccentLime.copy(alpha = 0.18f)
+                                else Color.White.copy(alpha = 0.1f)
+                            )
+                            .border(
+                                width = if (isSearchActive) 1.dp else 0.dp,
+                                color = if (isSearchActive) AccentLime.copy(alpha = 0.6f) else Color.Transparent,
+                                shape = CircleShape
+                            )
+                            .clickable(onClick = onSearchClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Buscar en playlist",
+                            tint = if (isSearchActive) AccentLime else Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
