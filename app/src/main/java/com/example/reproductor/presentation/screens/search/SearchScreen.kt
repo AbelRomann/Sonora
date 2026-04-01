@@ -23,24 +23,46 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.reproductor.domain.model.Song
 import com.example.reproductor.presentation.components.SongItem
+import com.example.reproductor.presentation.components.SongOptionsSheet
+import com.example.reproductor.presentation.library.LibraryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onNavigateToPlayer: () -> Unit,
     onBackClick: () -> Unit,
-    viewModel: SearchViewModel = hiltViewModel()
+    viewModel: SearchViewModel = hiltViewModel(),
+    libraryViewModel: LibraryViewModel = hiltViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle()
+
+    var selectedSong by remember { mutableStateOf<Song?>(null) }
+
+    // Gradient palette cycling (same as HomeScreen)
+    val gradientPalette = remember {
+        listOf(
+            listOf(Color(0xFF7B61FF), Color(0xFFFF5F7E)),
+            listOf(Color(0xFF4FD5FF), Color(0xFF1A6AFF)),
+            listOf(Color(0xFF00C896), Color(0xFF4FD5FF)),
+            listOf(Color(0xFFFFCC4F), Color(0xFFFF6B4A)),
+            listOf(Color(0xFFFF73C2), Color(0xFF9C7BFF)),
+            listOf(Color(0xFF4FA0FF), Color(0xFF00C896)),
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -95,12 +117,44 @@ fun SearchScreen(
                     )
                 }
                 items(searchResults, key = { it.id }, contentType = { "SongItem" }) { song ->
-                    SongItem(song = song, onClick = {
-                        viewModel.playSong(song)
-                        onNavigateToPlayer()
-                    })
+                    SongItem(
+                        song = song,
+                        onClick = {
+                            viewModel.playSong(song)
+                            onNavigateToPlayer()
+                        },
+                        onLongClick = { selectedSong = song },
+                        onMoreClick = { selectedSong = song }
+                    )
                 }
             }
         }
+    }
+
+    // ── Song Options Sheet ────────────────────────────────────────────────────
+    selectedSong?.let { song ->
+        val songIndex = searchResults.indexOf(song).coerceAtLeast(0)
+        SongOptionsSheet(
+            song = song,
+            playlists = playlists,
+            coverGradient = gradientPalette[songIndex % gradientPalette.size],
+            onDismiss = { selectedSong = null },
+            onPlayNext = {
+                libraryViewModel.playNext(song)
+                selectedSong = null
+            },
+            onAddToQueue = {
+                libraryViewModel.addToQueue(song)
+                selectedSong = null
+            },
+            onAddToPlaylist = { playlistId ->
+                libraryViewModel.addSongToPlaylist(playlistId, song.id)
+                selectedSong = null
+            },
+            onToggleFavorite = {
+                libraryViewModel.toggleFavorite(song.id)
+                selectedSong = null
+            }
+        )
     }
 }
