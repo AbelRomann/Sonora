@@ -55,4 +55,10 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE playCount > 0 ORDER BY playCount DESC LIMIT :limit")
     fun getMostPlayedSongs(limit: Int): Flow<List<SongEntity>>
+
+    @Query("SELECT * FROM songs WHERE lastPlayed > 0 ORDER BY lastPlayed DESC LIMIT :limit")
+    fun getRecentlyPlayedSongs(limit: Int): Flow<List<SongEntity>>
+
+    @Query("UPDATE songs SET lastPlayed = :timestamp WHERE id = :songId")
+    suspend fun updateLastPlayed(songId: Long, timestamp: Long)
 }

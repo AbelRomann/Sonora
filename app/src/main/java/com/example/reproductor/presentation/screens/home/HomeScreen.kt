@@ -19,11 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -96,6 +99,9 @@ fun HomeScreen(
     val shuffleModeEnabled by playerViewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
+    val recentlyPlayedSongs by viewModel.recentlyPlayedSongs.collectAsStateWithLifecycle()
+
+    val recentlyAddedSongs = remember(songs) { songs.take(10) }
 
     val mostPlayedTracks = remember(mostPlayedSongs) {
         mostPlayedSongs.map { it.toMostPlayedTrack() }
@@ -125,26 +131,27 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(PlayerBackground)
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(horizontal = 20.dp),
+                .windowInsetsPadding(WindowInsets.systemBars),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
         // ── Block 1: Header ──
         item {
-            Spacer(Modifier.height(48.dp))
-            Text(
-                text = "BUENOS DÍAS",
-                color = TextMuted,
-                style = MaterialTheme.typography.labelSmall
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Reproduciendo",
-                color = Color(0xFFF0F0F8),
-                style = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp),
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(Modifier.height(20.dp))
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(48.dp))
+                Text(
+                    text = "BUENOS DÍAS",
+                    color = TextMuted,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Reproduciendo",
+                    color = Color(0xFFF0F0F8),
+                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp),
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(20.dp))
+            }
         }
 
         // ── Block 2: Now Playing Card ──
@@ -152,6 +159,7 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
                     .clickable { if (featured != null) onSongClick(featured) },
                 shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
@@ -314,125 +322,49 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(36.dp))
         }
 
         // ── Block 2.5: Most Played Section ──
         if (mostPlayedTracks.isNotEmpty()) {
             item {
-                MostPlayedSection(
-                    tracks = mostPlayedTracks,
-                    onItemClick = { songId ->
-                        songs.find { it.id == songId }?.let { song ->
-                            onSongClick(song)
+                Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    MostPlayedSection(
+                        tracks = mostPlayedTracks,
+                        onItemClick = { songId ->
+                            songs.find { it.id == songId }?.let { song ->
+                                onSongClick(song)
+                            }
                         }
-                    }
-                )
-                Spacer(Modifier.height(24.dp))
+                    )
+                }
+                Spacer(Modifier.height(36.dp))
             }
         }
 
-        // ── Block 3: Recents Header ──
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recientes",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+        // ── Block 3: Recently Added Section ──
+        if (recentlyAddedSongs.isNotEmpty()) {
+            item {
+                HorizontalSongSection(
+                    title = "Últimos agregados",
+                    songs = recentlyAddedSongs,
+                    onSongClick = onSongClick,
+                    onSongLongClick = { selectedSong = it }
                 )
-                Text(
-                    text = "ver todo →",
-                    color = AccentLime,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.clickable(onClick = onNavigateToLibrary)
-                )
+                Spacer(Modifier.height(36.dp))
             }
-            Spacer(Modifier.height(8.dp))
         }
 
-        // ── Recents List ──
-        items(songs.take(5), key = { it.id }, contentType = { "SongItem" }) { song ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(RecentCardBg)
-                    .combinedClickable(
-                        onClick = { onSongClick(song) },
-                        onLongClick = { selectedSong = song }
-                    )
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Thumbnail
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    CoverGradientStart.copy(alpha = 0.7f),
-                                    CoverGradientEnd.copy(alpha = 0.7f)
-                                )
-                            )
-                        )
-                ) {
-                    if (!song.albumArt.isNullOrBlank()) {
-                        AsyncImage(
-                            model = song.albumArt,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(12.dp))
-
-                // Title + Artist
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.artist,
-                        color = TextMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Duration
-                Text(
-                    text = formatDuration(song.duration),
-                    color = TextMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(end = 4.dp)
+        // ── Block 4: Recently Played Section ──
+        if (recentlyPlayedSongs.isNotEmpty()) {
+            item {
+                HorizontalSongSection(
+                    title = "Reproducciones recientes",
+                    songs = recentlyPlayedSongs,
+                    onSongClick = onSongClick,
+                    onSongLongClick = { selectedSong = it }
                 )
-
-                // More button
-                IconButton(
-                    onClick = { selectedSong = song },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "Opciones",
-                        tint = TextMuted.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Spacer(Modifier.height(36.dp))
             }
         }
 
@@ -495,6 +427,117 @@ fun HomeScreen(
             onRemoveAt = { index -> playerViewModel.removeFromQueue(index) },
             onMoveItem = { from, to -> playerViewModel.moveQueueItem(from, to) },
             onClearQueue = { playerViewModel.clearQueue() }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HorizontalSongSection(
+    title: String,
+    songs: List<Song>,
+    onSongClick: (Song) -> Unit,
+    onSongLongClick: (Song) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp)
+        ) {
+            items(songs, key = { it.id }) { song ->
+                HorizontalSongCard(
+                    song = song,
+                    onClick = { onSongClick(song) },
+                    onLongClick = { onSongLongClick(song) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HorizontalSongCard(
+    song: Song,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(130.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .size(130.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(CoverGradientStart, CoverGradientEnd)
+                    )
+                )
+        ) {
+            if (!song.albumArt.isNullOrBlank()) {
+                AsyncImage(
+                    model = song.albumArt,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            // Play indicator inside cover (bottom right)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = song.title,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = song.artist,
+            color = TextSubtle,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

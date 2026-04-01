@@ -29,4 +29,6 @@ interface MusicRepository {
 
     fun getMostPlayedSongs(limit: Int = 20): Flow<List<Song>>
     suspend fun incrementPlayCount(songId: Long)
+    fun getRecentlyPlayedSongs(limit: Int = 15): Flow<List<Song>>
+    suspend fun updateLastPlayed(songId: Long, timestamp: Long)
 }

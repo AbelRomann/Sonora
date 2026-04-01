@@ -25,7 +25,8 @@ data class SongEntity(
     val albumArt: String?,
     val dateAdded: Long = System.currentTimeMillis(),
     val isFavorite: Boolean = false,
-    val playCount: Int = 0
+    val playCount: Int = 0,
+    val lastPlayed: Long = 0L
 )
 
 @androidx.room.Fts4(contentEntity = SongEntity::class)
@@ -50,5 +51,6 @@ fun SongEntity.toDomain() = Song(
     artistId = artistId,
     albumArt = albumArt,
     isFavorite = isFavorite,
-    playCount = playCount
+    playCount = playCount,
+    lastPlayed = lastPlayed
 )

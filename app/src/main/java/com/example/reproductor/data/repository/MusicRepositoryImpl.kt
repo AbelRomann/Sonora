@@ -214,6 +214,18 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getRecentlyPlayedSongs(limit: Int): Flow<List<Song>> {
+        return songDao.getRecentlyPlayedSongs(limit)
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(Dispatchers.IO)
+    }
+
+    override suspend fun updateLastPlayed(songId: Long, timestamp: Long) {
+        withContext(Dispatchers.IO) {
+            songDao.updateLastPlayed(songId, timestamp)
+        }
+    }
+
     private suspend fun syncSongsIncrementally(newSongs: List<SongEntity>) {
         val currentSongs = songDao.getSongsSnapshot()
         val currentSongsById = currentSongs.associateBy { it.id }
@@ -225,10 +237,11 @@ class MusicRepositoryImpl @Inject constructor(
         val songsToUpsert = newSongs.map { newSong ->
             val existingSong = currentSongsById[newSong.id]
             if (existingSong != null) {
-                // Preserve user-generated fields (playCount, isFavorite) from existing data
+                // Preserve user-generated fields from existing data
                 newSong.copy(
                     playCount = existingSong.playCount,
-                    isFavorite = existingSong.isFavorite
+                    isFavorite = existingSong.isFavorite,
+                    lastPlayed = existingSong.lastPlayed
                 )
             } else {
                 newSong

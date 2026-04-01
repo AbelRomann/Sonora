@@ -42,10 +42,12 @@ class MusicPlayerController @Inject constructor(
 
     // ── Play-count threshold (30 s) ──────────────────────────────────────────
     private val minListenMs = 30_000L          // require 30 seconds of listening
+    private val minListenMsForHistory = 15_000L // require 15 seconds for recent history
     private var currentListenSongId: Long? = null
     private var listenStartMs: Long? = null    // wall-clock ms when playback started
     private var listenedMs: Long = 0L          // accumulated listening time for current song
     private var playCountCounted: Boolean = false // true once count has been registered
+    private var historyCounted: Boolean = false // true once history has been updated
     // Guard to prevent double-commit when both onPositionDiscontinuity and
     // onMediaItemTransition fire for the same automatic loop event.
     private var lastAutoTransitionHandledMs: Long = 0L
@@ -117,6 +119,7 @@ class MusicPlayerController @Inject constructor(
                 listenStartMs = null
                 listenedMs = 0L
                 playCountCounted = false
+                historyCounted = false
 
                 updatePlayerState()
 
@@ -146,6 +149,7 @@ class MusicPlayerController @Inject constructor(
                         listenStartMs = null
                         listenedMs = 0L
                         playCountCounted = false
+                        historyCounted = false
                         if (mediaController?.isPlaying == true) {
                             recordListenStart()
                         }
@@ -197,15 +201,28 @@ class MusicPlayerController @Inject constructor(
             listenedMs += System.currentTimeMillis() - start
             listenStartMs = null
         }
+        checkListenThresholds()
     }
 
     /**
-     * Adds any in-progress listening time and, if the total >= 30 s and the
-     * count hasn't been registered yet, increments the play count.
+     * Commits any in-progress listening time and resets accumulators.
      */
     private fun commitListenTimeIfNeeded() {
         pauseListenClock() // accumulate any running segment
+    }
+
+    private fun checkListenThresholds() {
         val songId = currentListenSongId ?: return
+        
+        // 15 seconds threshold for "Recently Played"
+        if (!historyCounted && listenedMs >= minListenMsForHistory) {
+            historyCounted = true
+            coroutineScope.launch {
+                musicRepository.updateLastPlayed(songId, System.currentTimeMillis())
+            }
+        }
+        
+        // 30 seconds threshold for "Most Played" (playCount)
         if (!playCountCounted && listenedMs >= minListenMs) {
             playCountCounted = true
             coroutineScope.launch {
@@ -225,6 +242,18 @@ class MusicPlayerController @Inject constructor(
                     currentPosition = currentPosition,
                     duration = duration
                 )
+            }
+        }
+        // Re-evaluate thresholds on the fly while playing so changes reflect immediately
+        if (playCountCounted && historyCounted) return
+        val currentListenStart = listenStartMs ?: return
+        val currentListenedMs = listenedMs + (System.currentTimeMillis() - currentListenStart)
+        if (!historyCounted && currentListenedMs >= minListenMsForHistory ||
+            !playCountCounted && currentListenedMs >= minListenMs) {
+            // Pause/resume clock to update listenedMs and trigger check
+            pauseListenClock()
+            if (mediaController?.isPlaying == true) {
+                recordListenStart()
             }
         }
     }

@@ -62,6 +62,10 @@ class LibraryViewModel @Inject constructor(
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val recentlyPlayedSongs: StateFlow<List<Song>> = musicRepository.getRecentlyPlayedSongs(15)
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _selectedFilter = MutableStateFlow(LibraryFilter.TODAS)
     val selectedFilter: StateFlow<LibraryFilter> = _selectedFilter.asStateFlow()
 
