@@ -275,14 +275,7 @@ fun PlayerScreen(
         Spacer(Modifier.height(12.dp))
 
         // ── Top bar ─────────────────────────────────────────────
-<<<<<<< HEAD
         TopBar(onBackClick = onBackClick, onMenuClick = { showPlayerOptionsSheet = true })
-=======
-        TopBar(
-            onBackClick = onBackClick,
-            onOpenTools = { showAudioToolsSheet = true }
-        )
->>>>>>> 2e14ccef6d9b9d05849bf8b6a90845f167e040a9
 
         Spacer(Modifier.height(24.dp))
 
@@ -485,7 +478,6 @@ fun PlayerScreen(
         )
     }
 
-<<<<<<< HEAD
     // ── Player options sheet (EQ + Sleep Timer) ──────────────────
     if (showPlayerOptionsSheet) {
         PlayerOptionsSheet(
@@ -499,21 +491,6 @@ fun PlayerScreen(
             },
             onCancelSleepTimer = { viewModel.cancelSleepTimer() }
         )
-=======
-    if (showAudioToolsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAudioToolsSheet = false },
-            containerColor = Color(0xFF111118)
-        ) {
-            AudioToolsSheet(
-                sleepTimerRemainingMs = sleepTimerRemainingMs,
-                currentPreset = eqPreset,
-                onSleepTimerSelected = { viewModel.startSleepTimer(it) },
-                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                onEqPresetSelected = { viewModel.setEqPreset(it) }
-            )
-        }
->>>>>>> 2e14ccef6d9b9d05849bf8b6a90845f167e040a9
     }
 }
 
@@ -522,14 +499,7 @@ fun PlayerScreen(
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-<<<<<<< HEAD
 private fun TopBar(onBackClick: () -> Unit, onMenuClick: () -> Unit) {
-=======
-private fun TopBar(
-    onBackClick: () -> Unit,
-    onOpenTools: () -> Unit
-) {
->>>>>>> 2e14ccef6d9b9d05849bf8b6a90845f167e040a9
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -549,11 +519,7 @@ private fun TopBar(
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
-<<<<<<< HEAD
         IconButton(onClick = onMenuClick) {
-=======
-        IconButton(onClick = onOpenTools) {
->>>>>>> 2e14ccef6d9b9d05849bf8b6a90845f167e040a9
             Icon(
                 Icons.Default.MoreVert,
                 contentDescription = "Opciones de audio",
