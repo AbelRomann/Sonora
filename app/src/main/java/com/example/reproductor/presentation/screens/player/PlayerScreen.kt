@@ -111,7 +111,6 @@ import com.example.reproductor.presentation.components.PlayerOptionsSheet
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
-import com.example.reproductor.presentation.player.MusicPlayerController.EqPreset
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
 import com.example.reproductor.presentation.player.EqPreset
 import kotlin.math.absoluteValue
