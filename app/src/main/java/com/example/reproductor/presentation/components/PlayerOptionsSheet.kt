@@ -1,0 +1,221 @@
+package com.example.reproductor.presentation.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.reproductor.presentation.player.EqPreset
+
+private val SheetBg    = Color(0xFF0D1320)
+private val SectionBg  = Color(0xFF141C2E)
+private val AccentLime = Color(0xFFE8FF47)
+private val AccentBlue = Color(0xFF4FD5FF)
+private val TextMutedC = Color(0xFF6B6B85)
+private val Divider    = Color(0xFF1B2238)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlayerOptionsSheet(
+    currentEqPreset: EqPreset,
+    sleepTimerRemainingMs: Long?,
+    onDismiss: () -> Unit,
+    onSetEqPreset: (EqPreset) -> Unit,
+    onStartSleepTimer: (Int) -> Unit,
+    onCancelSleepTimer: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SheetBg,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.18f))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+
+            // ── Title ────────────────────────────────────────────────────────
+            Text(
+                text = "Opciones del reproductor",
+                color = Color.White,
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp, top = 4.dp)
+            )
+
+            HorizontalDivider(thickness = 0.5.dp, color = Divider)
+            Spacer(Modifier.height(20.dp))
+
+            // ── Equalizer section ────────────────────────────────────────────
+            SectionHeader(icon = Icons.Default.Equalizer, title = "Ecualizador")
+            Spacer(Modifier.height(12.dp))
+
+            val presets = listOf(
+                EqPreset.FLAT        to "Plano",
+                EqPreset.BASS_BOOST  to "Graves",
+                EqPreset.VOCAL       to "Vocal",
+                EqPreset.TREBLE_BOOST to "Agudos"
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                presets.forEach { (preset, label) ->
+                    val isSelected = currentEqPreset == preset
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) AccentLime.copy(alpha = 0.15f)
+                                else SectionBg
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.dp,
+                                color = if (isSelected) AccentLime else Color.Transparent,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { onSetEqPreset(preset) }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) AccentLime else TextMutedC,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(thickness = 0.5.dp, color = Divider)
+            Spacer(Modifier.height(20.dp))
+
+            // ── Sleep Timer section ──────────────────────────────────────────
+            SectionHeader(icon = Icons.Default.Bedtime, title = "Temporizador de sueño")
+            Spacer(Modifier.height(12.dp))
+
+            if (sleepTimerRemainingMs != null) {
+                // Timer is active — show remaining time and cancel button
+                val totalSec = (sleepTimerRemainingMs / 1000).toInt()
+                val mins = totalSec / 60
+                val secs = totalSec % 60
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Tiempo restante: %02d:%02d".format(mins, secs),
+                        color = AccentBlue,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                    IconButton(onClick = onCancelSleepTimer) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Cancelar temporizador",
+                            tint = Color(0xFFFF5F7E),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            } else {
+                // Timer is off — show quick-select buttons
+                val options = listOf(5 to "5 min", 10 to "10 min", 15 to "15 min",
+                                     30 to "30 min", 45 to "45 min", 60 to "60 min")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    options.chunked(3).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            rowItems.forEach { (minutes, label) ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(SectionBg)
+                                        .clickable { onStartSleepTimer(minutes) }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = AccentLime, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp
+        )
+    }
+}

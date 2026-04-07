@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.example.reproductor.presentation.player.EqPreset
+
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val controller: MusicPlayerController,
@@ -26,6 +28,8 @@ class PlayerViewModel @Inject constructor(
     val playbackProgress: StateFlow<PlaybackProgress> = controller.playbackProgress
     val repeatMode: StateFlow<Int> = controller.repeatMode
     val shuffleModeEnabled: StateFlow<Boolean> = controller.shuffleModeEnabled
+    val sleepTimerRemainingMs: StateFlow<Long?> = controller.sleepTimerRemainingMs
+    val eqPreset: StateFlow<EqPreset> = controller.eqPreset
 
     val playlists: StateFlow<List<Playlist>> = musicRepository.getAllPlaylists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -60,4 +64,12 @@ class PlayerViewModel @Inject constructor(
     fun skipToIndex(index: Int) = controller.skipToIndex(index)
     fun moveQueueItem(from: Int, to: Int) = controller.moveQueueItem(from, to)
     fun clearQueue() = controller.clearQueue()
+
+    // ── Sleep timer ──────────────────────────────────────────────────────────
+    fun startSleepTimer(minutes: Int) = controller.startSleepTimer(minutes)
+    fun cancelSleepTimer() = controller.cancelSleepTimer()
+
+    // ── Equalizer ────────────────────────────────────────────────────────────
+    fun setEqPreset(preset: EqPreset) = controller.setEqPreset(preset)
 }
+

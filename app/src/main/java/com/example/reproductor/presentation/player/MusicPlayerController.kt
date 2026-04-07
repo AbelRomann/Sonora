@@ -2,6 +2,7 @@ package com.example.reproductor.presentation.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.audiofx.Equalizer
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -35,28 +36,27 @@ class MusicPlayerController @Inject constructor(
     private val musicRepository: MusicRepository
 ) {
     private var mediaController: MediaController? = null
-    // Fix #10: SupervisorJob prevents one failure from cancelling the entire scope
+    private var equalizer: Equalizer? = null
+    private var equalizerSessionId: Int = -1
+    // SupervisorJob prevents one failure from cancelling the entire scope
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressUpdateJob: Job? = null
     private val audioFadeManager = AudioFadeManager(coroutineScope)
 
-    // ── Play-count threshold (30 s) ──────────────────────────────────────────
-    private val minListenMs = 30_000L          // require 30 seconds of listening
-    private val minListenMsForHistory = 15_000L // require 15 seconds for recent history
+    // ── Play-count threshold ──────────────────────────────────────────────────
+    private val minListenMs = 30_000L
+    private val minListenMsForHistory = 15_000L
     private var currentListenSongId: Long? = null
-    private var listenStartMs: Long? = null    // wall-clock ms when playback started
-    private var listenedMs: Long = 0L          // accumulated listening time for current song
-    private var playCountCounted: Boolean = false // true once count has been registered
-    private var historyCounted: Boolean = false // true once history has been updated
-    // Guard to prevent double-commit when both onPositionDiscontinuity and
-    // onMediaItemTransition fire for the same automatic loop event.
+    private var listenStartMs: Long? = null
+    private var listenedMs: Long = 0L
+    private var playCountCounted: Boolean = false
+    private var historyCounted: Boolean = false
     private var lastAutoTransitionHandledMs: Long = 0L
 
-    // Estado de canción/reproducción: solo cambia al cambiar de pista, pause/play, modo, etc.
+    // ── State flows ───────────────────────────────────────────────────────────
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
 
-    // Progreso de reproducción: se actualiza cada segundo (separado para evitar recomposición completa)
     private val _playbackProgress = MutableStateFlow(PlaybackProgress())
     val playbackProgress: StateFlow<PlaybackProgress> = _playbackProgress.asStateFlow()
 
@@ -65,6 +65,13 @@ class MusicPlayerController @Inject constructor(
 
     private val _shuffleModeEnabled = MutableStateFlow(false)
     val shuffleModeEnabled: StateFlow<Boolean> = _shuffleModeEnabled.asStateFlow()
+
+    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
+    private var sleepTimerJob: Job? = null
+
+    private val _eqPreset = MutableStateFlow(EqPreset.FLAT)
+    val eqPreset: StateFlow<EqPreset> = _eqPreset.asStateFlow()
 
     init {
         initializeController()
@@ -84,9 +91,9 @@ class MusicPlayerController @Inject constructor(
                 mediaController?.let { controller ->
                     _repeatMode.value = controller.repeatMode
                     _shuffleModeEnabled.value = controller.shuffleModeEnabled
+                    setupEqualizer(0)
                 }
                 setupPlayerListener()
-                // Only start polling if already playing
                 if (mediaController?.isPlaying == true) {
                     startProgressUpdates()
                 }
@@ -101,29 +108,23 @@ class MusicPlayerController @Inject constructor(
                 updatePlayerState()
                 if (isPlaying) {
                     startProgressUpdates()
-                    recordListenStart()   // player resumed — start the clock
+                    recordListenStart()
                 } else {
                     stopProgressUpdates()
-                    updateProgress()      // one final update to sync position
-                    pauseListenClock()    // player paused — accumulate elapsed time
+                    updateProgress()
+                    pauseListenClock()
                 }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                // Commit any accumulated time for the PREVIOUS song before resetting
                 commitListenTimeIfNeeded()
-
-                // Reset counters for the new song
                 val newSongId = mediaItem?.mediaId?.toLongOrNull()
                 currentListenSongId = newSongId
                 listenStartMs = null
                 listenedMs = 0L
                 playCountCounted = false
                 historyCounted = false
-
                 updatePlayerState()
-
-                // Start the listen clock immediately if already playing
                 if (mediaController?.isPlaying == true) {
                     recordListenStart()
                 }
@@ -134,16 +135,11 @@ class MusicPlayerController @Inject constructor(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
-                // DISCONTINUITY_REASON_AUTO_TRANSITION fires when a song ends and
-                // loops (REPEAT_MODE_ONE) or moves to the next item (REPEAT_MODE_ALL).
-                // onMediaItemTransition may or may not also fire for the same event,
-                // so we use a 500 ms guard to avoid double-committing.
                 if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
                     val now = System.currentTimeMillis()
                     if (now - lastAutoTransitionHandledMs > 500L) {
                         lastAutoTransitionHandledMs = now
                         commitListenTimeIfNeeded()
-                        // Reset counters for the new playback cycle of the same song
                         val newSongId = mediaController?.currentMediaItem?.mediaId?.toLongOrNull()
                         currentListenSongId = newSongId
                         listenStartMs = null
@@ -159,6 +155,7 @@ class MusicPlayerController @Inject constructor(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayerState()
+                setupEqualizer(0)
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
@@ -170,6 +167,90 @@ class MusicPlayerController @Inject constructor(
             }
         })
     }
+
+    // ── Sleep timer ───────────────────────────────────────────────────────────
+
+    fun startSleepTimer(minutes: Int) {
+        if (minutes <= 0) return
+        val durationMs = minutes * 60_000L
+        sleepTimerJob?.cancel()
+        _sleepTimerRemainingMs.value = durationMs
+        sleepTimerJob = coroutineScope.launch {
+            val endAt = System.currentTimeMillis() + durationMs
+            while (isActive) {
+                val remaining = (endAt - System.currentTimeMillis()).coerceAtLeast(0L)
+                _sleepTimerRemainingMs.value = remaining
+                if (remaining == 0L) {
+                    pause()
+                    break
+                }
+                delay(1000L)
+            }
+            _sleepTimerRemainingMs.value = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemainingMs.value = null
+    }
+
+    // ── Equalizer ─────────────────────────────────────────────────────────────
+
+    fun setEqPreset(preset: EqPreset) {
+        _eqPreset.value = preset
+        applyEqPreset(preset)
+    }
+
+    private fun setupEqualizer(audioSessionId: Int) {
+        if (audioSessionId < 0 || audioSessionId == equalizerSessionId) return
+        runCatching {
+            equalizer?.release()
+            equalizer = Equalizer(0, audioSessionId).apply {
+                enabled = true
+            }
+            equalizerSessionId = audioSessionId
+            applyEqPreset(_eqPreset.value)
+        }
+    }
+
+    private fun applyEqPreset(preset: EqPreset) {
+        val eq = equalizer ?: return
+        runCatching {
+            val numberOfBands = eq.numberOfBands.toInt()
+            val minLevel = eq.bandLevelRange[0].toInt()
+            val maxLevel = eq.bandLevelRange[1].toInt()
+            val boost = ((maxLevel - minLevel) * 0.32f).toInt()
+            val bassLimit = 250_000
+            val trebleStart = 4_000_000
+
+            for (band in 0 until numberOfBands) {
+                val centerFreq = eq.getCenterFreq(band.toShort())
+                val level = when (preset) {
+                    EqPreset.FLAT -> 0
+                    EqPreset.BASS_BOOST -> when {
+                        centerFreq <= bassLimit -> boost
+                        centerFreq >= trebleStart -> -boost / 2
+                        else -> 0
+                    }
+                    EqPreset.VOCAL -> when {
+                        centerFreq in 800_000..3_000_000 -> boost
+                        centerFreq <= bassLimit -> -boost / 3
+                        else -> 0
+                    }
+                    EqPreset.TREBLE_BOOST -> when {
+                        centerFreq >= trebleStart -> boost
+                        centerFreq <= bassLimit -> -boost / 2
+                        else -> 0
+                    }
+                }.coerceIn(minLevel, maxLevel)
+                eq.setBandLevel(band.toShort(), level.toShort())
+            }
+        }
+    }
+
+    // ── Progress updates ──────────────────────────────────────────────────────
 
     private fun startProgressUpdates() {
         if (progressUpdateJob?.isActive == true) return
@@ -186,16 +267,14 @@ class MusicPlayerController @Inject constructor(
         progressUpdateJob = null
     }
 
-    // ── Listen-time tracking helpers ─────────────────────────────────────────
+    // ── Listen-time tracking ──────────────────────────────────────────────────
 
-    /** Called when playback starts or resumes. Saves the wall-clock start time. */
     private fun recordListenStart() {
         if (listenStartMs == null) {
             listenStartMs = System.currentTimeMillis()
         }
     }
 
-    /** Called when playback pauses. Adds elapsed time to the accumulator. */
     private fun pauseListenClock() {
         listenStartMs?.let { start ->
             listenedMs += System.currentTimeMillis() - start
@@ -204,25 +283,20 @@ class MusicPlayerController @Inject constructor(
         checkListenThresholds()
     }
 
-    /**
-     * Commits any in-progress listening time and resets accumulators.
-     */
     private fun commitListenTimeIfNeeded() {
-        pauseListenClock() // accumulate any running segment
+        pauseListenClock()
     }
 
     private fun checkListenThresholds() {
         val songId = currentListenSongId ?: return
-        
-        // 15 seconds threshold for "Recently Played"
+
         if (!historyCounted && listenedMs >= minListenMsForHistory) {
             historyCounted = true
             coroutineScope.launch {
                 musicRepository.updateLastPlayed(songId, System.currentTimeMillis())
             }
         }
-        
-        // 30 seconds threshold for "Most Played" (playCount)
+
         if (!playCountCounted && listenedMs >= minListenMs) {
             playCountCounted = true
             coroutineScope.launch {
@@ -231,7 +305,6 @@ class MusicPlayerController @Inject constructor(
         }
     }
 
-    // Fix #4: Only emit when values actually change to avoid unnecessary recomposition
     private fun updateProgress() {
         mediaController?.let { controller ->
             val currentPosition = controller.currentPosition.coerceAtLeast(0)
@@ -244,13 +317,11 @@ class MusicPlayerController @Inject constructor(
                 )
             }
         }
-        // Re-evaluate thresholds on the fly while playing so changes reflect immediately
         if (playCountCounted && historyCounted) return
         val currentListenStart = listenStartMs ?: return
         val currentListenedMs = listenedMs + (System.currentTimeMillis() - currentListenStart)
         if (!historyCounted && currentListenedMs >= minListenMsForHistory ||
             !playCountCounted && currentListenedMs >= minListenMs) {
-            // Pause/resume clock to update listenedMs and trigger check
             pauseListenClock()
             if (mediaController?.isPlaying == true) {
                 recordListenStart()
@@ -281,7 +352,6 @@ class MusicPlayerController @Inject constructor(
                 currentIndex = controller.currentMediaItemIndex
             )
 
-            // Sincronizar progreso inmediatamente al cambiar de pista
             _playbackProgress.value = PlaybackProgress(
                 currentPosition = controller.currentPosition.coerceAtLeast(0),
                 duration = controller.duration.coerceAtLeast(0)
@@ -289,13 +359,14 @@ class MusicPlayerController @Inject constructor(
         }
     }
 
+    // ── Playback controls ─────────────────────────────────────────────────────
+
     fun playSongs(songs: List<Song>, startIndex: Int = 0) {
         mediaController?.let { controller ->
             val mediaItems = songs.map { song -> song.toMediaItem() }
             controller.setMediaItems(mediaItems, startIndex, 0)
             controller.prepare()
             controller.play()
-
             _playerState.value = _playerState.value.copy(
                 queue = songs,
                 currentIndex = startIndex
@@ -352,7 +423,6 @@ class MusicPlayerController @Inject constructor(
             val updatedQueue = _playerState.value.queue.toMutableList()
             val item = updatedQueue.removeAt(from)
             updatedQueue.add(to, item)
-            // Recalculate currentIndex after reorder
             val newCurrentIndex = when {
                 _playerState.value.currentIndex == from -> to
                 from < _playerState.value.currentIndex && to >= _playerState.value.currentIndex ->
@@ -367,14 +437,11 @@ class MusicPlayerController @Inject constructor(
 
     fun clearQueue() {
         mediaController?.let { controller ->
-            // Keep only the currently-playing item
             val currentIndex = controller.currentMediaItemIndex
             val count = controller.mediaItemCount
-            // Remove items after current
             if (currentIndex + 1 < count) {
                 controller.removeMediaItems(currentIndex + 1, count)
             }
-            // Remove items before current
             if (currentIndex > 0) {
                 controller.removeMediaItems(0, currentIndex)
             }
@@ -394,7 +461,6 @@ class MusicPlayerController @Inject constructor(
 
     fun seekTo(position: Long) {
         mediaController?.seekTo(position)
-        // Actualizar el progreso inmediatamente para que el Slider no "salte" de vuelta
         _playbackProgress.value = _playbackProgress.value.copy(currentPosition = position)
     }
 
@@ -423,9 +489,13 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun release() {
-        commitListenTimeIfNeeded() // flush any pending listen time on release
+        commitListenTimeIfNeeded()
         audioFadeManager.cancelFade()
+        cancelSleepTimer()
         progressUpdateJob?.cancel()
+        equalizer?.release()
+        equalizer = null
+        equalizerSessionId = -1
         mediaController?.release()
         mediaController = null
     }

@@ -102,10 +102,12 @@ import coil.compose.AsyncImagePainter
 import coil.ImageLoader
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
+import com.example.reproductor.presentation.components.PlayerOptionsSheet
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
+import com.example.reproductor.presentation.player.EqPreset
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -132,6 +134,8 @@ fun PlayerScreen(
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffleModeEnabled by viewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
+    val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    val eqPreset by viewModel.eqPreset.collectAsStateWithLifecycle()
 
     // Fix #9: derivedStateOf to avoid full-tree recomposition
     val queue by remember { derivedStateOf { playerState.queue } }
@@ -146,6 +150,9 @@ fun PlayerScreen(
     // ── Song options sheet state ────────────────────────────────
     var showSongOptionsSheet by remember { mutableStateOf(false) }
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+
+    // ── Player options sheet (EQ + Sleep Timer) ─────────────────
+    var showPlayerOptionsSheet by remember { mutableStateOf(false) }
 
     // ── Seek state ──────────────────────────────────────────────
     var isUserSeeking by remember { mutableStateOf(false) }
@@ -261,7 +268,7 @@ fun PlayerScreen(
         Spacer(Modifier.height(12.dp))
 
         // ── Top bar ─────────────────────────────────────────────
-        TopBar(onBackClick = onBackClick)
+        TopBar(onBackClick = onBackClick, onMenuClick = { showPlayerOptionsSheet = true })
 
         Spacer(Modifier.height(24.dp))
 
@@ -463,6 +470,21 @@ fun PlayerScreen(
             }
         )
     }
+
+    // ── Player options sheet (EQ + Sleep Timer) ──────────────────
+    if (showPlayerOptionsSheet) {
+        PlayerOptionsSheet(
+            currentEqPreset = eqPreset,
+            sleepTimerRemainingMs = sleepTimerRemainingMs,
+            onDismiss = { showPlayerOptionsSheet = false },
+            onSetEqPreset = { preset -> viewModel.setEqPreset(preset) },
+            onStartSleepTimer = { minutes ->
+                viewModel.startSleepTimer(minutes)
+                showPlayerOptionsSheet = false
+            },
+            onCancelSleepTimer = { viewModel.cancelSleepTimer() }
+        )
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -470,7 +492,7 @@ fun PlayerScreen(
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-private fun TopBar(onBackClick: () -> Unit) {
+private fun TopBar(onBackClick: () -> Unit, onMenuClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -490,7 +512,7 @@ private fun TopBar(onBackClick: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = { /* menu */ }) {
+        IconButton(onClick = onMenuClick) {
             Icon(
                 Icons.Default.MoreVert,
                 contentDescription = "Menú",

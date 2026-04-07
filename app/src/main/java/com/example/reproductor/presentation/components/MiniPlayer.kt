@@ -320,9 +320,8 @@ fun MarqueeText(
     style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium,
     color: Color = Color.Unspecified
 ) {
-    // Total duration: scroll + pause at end
-    val scrollDurationMs = 6000
-    val pauseFraction = 0.20f // 20% of cycle is pause at the end
+    // Total cycle duration in ms
+    val scrollDurationMs = 7000
 
     SubcomposeLayout(modifier = modifier) { constraints ->
         // Measure text unconstrained to find its natural width
@@ -348,7 +347,7 @@ fun MarqueeText(
                 // Overflow → marquee
                 val scrollPlaceable = subcompose("marquee") {
                     val infiniteTransition = rememberInfiniteTransition(label = "marquee")
-                    val offset by infiniteTransition.animateFloat(
+                    val rawOffset by infiniteTransition.animateFloat(
                         initialValue = 0f,
                         targetValue = 1f,
                         animationSpec = infiniteRepeatable(
@@ -361,11 +360,18 @@ fun MarqueeText(
                         label = "marqueeOffset"
                     )
 
-                    val gap = 80 // px gap between end of text and restart
-                    val totalScroll = textWidth + gap
-                    // Pause: fraction of the cycle where offset > scrollable distance
-                    val scrollPx = (totalScroll * (1f - pauseFraction) * offset)
-                        .coerceAtMost(totalScroll.toFloat())
+                    // Only scroll the overflow amount so the title starts fully visible
+                    val totalScroll = (textWidth - containerWidth).coerceAtLeast(0).toFloat()
+
+                    // Cycle breakdown:
+                    //  0.00–0.25 → pause at start (full title visible)
+                    //  0.25–0.80 → smooth scroll to end
+                    //  0.80–1.00 → pause at end before restart
+                    val scrollPx = when {
+                        rawOffset < 0.25f -> 0f
+                        rawOffset < 0.80f -> totalScroll * ((rawOffset - 0.25f) / 0.55f)
+                        else              -> totalScroll
+                    }
 
                     Box(
                         modifier = Modifier
