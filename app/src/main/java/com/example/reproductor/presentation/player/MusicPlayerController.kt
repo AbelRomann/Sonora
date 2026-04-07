@@ -96,7 +96,7 @@ class MusicPlayerController @Inject constructor(
                 mediaController?.let { controller ->
                     _repeatMode.value = controller.repeatMode
                     _shuffleModeEnabled.value = controller.shuffleModeEnabled
-                    setupEqualizer(controller.audioSessionId)
+                    setupEqualizer(0)
                 }
                 setupPlayerListener()
                 // Only start polling if already playing
@@ -172,7 +172,7 @@ class MusicPlayerController @Inject constructor(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayerState()
-                mediaController?.let { setupEqualizer(it.audioSessionId) }
+                setupEqualizer(0)
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
@@ -217,7 +217,7 @@ class MusicPlayerController @Inject constructor(
     }
 
     private fun setupEqualizer(audioSessionId: Int) {
-        if (audioSessionId <= 0 || audioSessionId == equalizerSessionId) return
+        if (audioSessionId < 0 || audioSessionId == equalizerSessionId) return
         runCatching {
             equalizer?.release()
             equalizer = Equalizer(0, audioSessionId).apply {
