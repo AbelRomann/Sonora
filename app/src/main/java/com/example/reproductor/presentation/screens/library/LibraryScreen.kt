@@ -28,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -64,6 +65,7 @@ fun LibraryScreen(
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
 
     var selectedSong by remember { mutableStateOf<Song?>(null) }
 
@@ -103,6 +105,30 @@ fun LibraryScreen(
                 FilterChipLike("Favoritas", selected = selectedFilter == LibraryFilter.FAVORITAS, onClick = { viewModel.setFilter(LibraryFilter.FAVORITAS) })
             }
             Text("${filteredSongs.size} canciones", color = Color(0xFF6B6B85), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            error?.let { errorMessage ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF321C24))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = Color(0xFFFFC7D4),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = {
+                            viewModel.clearError()
+                            viewModel.refreshMusic()
+                        }
+                    ) { Text("Reintentar", color = Color.White) }
+                }
+            }
         }
 
         itemsIndexed(filteredSongs.take(50), key = { _, s -> s.id }, contentType = { _, _ -> "SongItem" }) { index, song ->

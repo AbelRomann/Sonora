@@ -53,6 +53,19 @@ app/src/main/java/com/example/reproductor/
 
 ---
 
+
+## 🏪 Play Store Readiness
+
+Guías de publicación preparadas en `docs/playstore/`:
+
+- `privacy-policy.md` — política de privacidad editable
+- `data-safety.md` — guía para formulario Data Safety
+- `store-listing-es-419.md` — copy de ficha en español (LatAm)
+- `assets-checklist.md` — checklist de assets y cumplimiento
+- `week3-lyrics-ux-plan.md` — plan técnico para Lyrics local + UX
+
+---
+
 ## 🚀 Getting Started
 
 1. Clone the repo

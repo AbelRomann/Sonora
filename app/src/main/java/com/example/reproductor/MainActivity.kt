@@ -1,9 +1,12 @@
 package com.example.reproductor
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,11 +59,19 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private var hasPermission by mutableStateOf(false)
+    private var permanentlyDenied by mutableStateOf(false)
+    private var hasRequestedPermission by mutableStateOf(false)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasPermission = isGranted
+        if (!isGranted) {
+            val permission = currentAudioPermission()
+            permanentlyDenied = hasRequestedPermission && !shouldShowRequestPermissionRationale(permission)
+        } else {
+            permanentlyDenied = false
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,23 +86,46 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ReproductorTheme {
-                if (hasPermission) MusicPlayerApp() else PermissionScreen(onRequestPermission = ::checkAndRequestPermission)
+                if (hasPermission) {
+                    MusicPlayerApp()
+                } else {
+                    PermissionScreen(
+                        isPermanentlyDenied = permanentlyDenied,
+                        onRequestPermission = { checkAndRequestPermission(forceRequest = true) },
+                        onOpenSettings = ::openAppSettings
+                    )
+                }
             }
         }
     }
 
-    private fun checkAndRequestPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun currentAudioPermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_AUDIO
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
+    }
 
+    private fun checkAndRequestPermission(forceRequest: Boolean = false) {
+        val permission = currentAudioPermission()
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
             hasPermission = true
-        } else {
+            permanentlyDenied = false
+        } else if (forceRequest || !hasRequestedPermission) {
+            hasRequestedPermission = true
             requestPermissionLauncher.launch(permission)
+        } else {
+            permanentlyDenied = !shouldShowRequestPermissionRationale(permission)
         }
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+        startActivity(intent)
     }
 }
 
@@ -221,7 +255,11 @@ private fun BottomNavigationBar(currentRoute: String?, navController: NavHostCon
 }
 
 @Composable
-fun PermissionScreen(onRequestPermission: () -> Unit) {
+fun PermissionScreen(
+    isPermanentlyDenied: Boolean,
+    onRequestPermission: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(28.dp)) {
             Icon(
@@ -239,7 +277,19 @@ fun PermissionScreen(onRequestPermission: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(onClick = onRequestPermission) {
-                Text("Conceder acceso")
+                Text(if (isPermanentlyDenied) "Intentar de nuevo" else "Conceder acceso")
+            }
+            if (isPermanentlyDenied) {
+                Text(
+                    text = "Parece que el permiso fue bloqueado. Puedes habilitarlo desde Ajustes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)
+                )
+                Button(onClick = onOpenSettings) {
+                    Text("Abrir ajustes")
+                }
             }
         }
     }

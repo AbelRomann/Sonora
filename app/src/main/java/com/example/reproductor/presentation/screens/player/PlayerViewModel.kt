@@ -9,6 +9,7 @@ import com.example.reproductor.domain.model.Playlist
 import com.example.reproductor.domain.model.Song
 import com.example.reproductor.domain.repository.MusicRepository
 import com.example.reproductor.presentation.player.MusicPlayerController
+import com.example.reproductor.presentation.player.MusicPlayerController.EqPreset
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,8 @@ class PlayerViewModel @Inject constructor(
     val playbackProgress: StateFlow<PlaybackProgress> = controller.playbackProgress
     val repeatMode: StateFlow<Int> = controller.repeatMode
     val shuffleModeEnabled: StateFlow<Boolean> = controller.shuffleModeEnabled
+    val sleepTimerRemainingMs: StateFlow<Long?> = controller.sleepTimerRemainingMs
+    val eqPreset: StateFlow<EqPreset> = controller.eqPreset
 
     val playlists: StateFlow<List<Playlist>> = musicRepository.getAllPlaylists()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -40,6 +43,9 @@ class PlayerViewModel @Inject constructor(
     fun seekTo(position: Long) = controller.seekTo(position)
     fun toggleRepeatMode() = controller.toggleRepeatMode()
     fun toggleShuffleMode() = controller.toggleShuffleMode()
+    fun startSleepTimer(minutes: Int) = controller.startSleepTimer(minutes)
+    fun cancelSleepTimer() = controller.cancelSleepTimer()
+    fun setEqPreset(preset: EqPreset) = controller.setEqPreset(preset)
 
     fun toggleFavorite(songId: Long) {
         viewModelScope.launch {

@@ -3,6 +3,7 @@ package com.example.reproductor.presentation.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.media.audiofx.Equalizer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -34,7 +35,11 @@ class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicRepository: MusicRepository
 ) {
+    enum class EqPreset { FLAT, BASS_BOOST, VOCAL, TREBLE_BOOST }
+
     private var mediaController: MediaController? = null
+    private var equalizer: Equalizer? = null
+    private var equalizerSessionId: Int = -1
     // Fix #10: SupervisorJob prevents one failure from cancelling the entire scope
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressUpdateJob: Job? = null
@@ -66,6 +71,13 @@ class MusicPlayerController @Inject constructor(
     private val _shuffleModeEnabled = MutableStateFlow(false)
     val shuffleModeEnabled: StateFlow<Boolean> = _shuffleModeEnabled.asStateFlow()
 
+    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
+    private var sleepTimerJob: Job? = null
+
+    private val _eqPreset = MutableStateFlow(EqPreset.FLAT)
+    val eqPreset: StateFlow<EqPreset> = _eqPreset.asStateFlow()
+
     init {
         initializeController()
     }
@@ -84,6 +96,7 @@ class MusicPlayerController @Inject constructor(
                 mediaController?.let { controller ->
                     _repeatMode.value = controller.repeatMode
                     _shuffleModeEnabled.value = controller.shuffleModeEnabled
+                    setupEqualizer(controller.audioSessionId)
                 }
                 setupPlayerListener()
                 // Only start polling if already playing
@@ -159,6 +172,7 @@ class MusicPlayerController @Inject constructor(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayerState()
+                mediaController?.let { setupEqualizer(it.audioSessionId) }
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
@@ -169,6 +183,84 @@ class MusicPlayerController @Inject constructor(
                 _shuffleModeEnabled.value = shuffleModeEnabled
             }
         })
+    }
+
+    fun startSleepTimer(minutes: Int) {
+        if (minutes <= 0) return
+        val durationMs = minutes * 60_000L
+        sleepTimerJob?.cancel()
+        _sleepTimerRemainingMs.value = durationMs
+        sleepTimerJob = coroutineScope.launch {
+            val endAt = System.currentTimeMillis() + durationMs
+            while (isActive) {
+                val remaining = (endAt - System.currentTimeMillis()).coerceAtLeast(0L)
+                _sleepTimerRemainingMs.value = remaining
+                if (remaining == 0L) {
+                    pause()
+                    break
+                }
+                delay(1000L)
+            }
+            _sleepTimerRemainingMs.value = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemainingMs.value = null
+    }
+
+    fun setEqPreset(preset: EqPreset) {
+        _eqPreset.value = preset
+        applyEqPreset(preset)
+    }
+
+    private fun setupEqualizer(audioSessionId: Int) {
+        if (audioSessionId <= 0 || audioSessionId == equalizerSessionId) return
+        runCatching {
+            equalizer?.release()
+            equalizer = Equalizer(0, audioSessionId).apply {
+                enabled = true
+            }
+            equalizerSessionId = audioSessionId
+            applyEqPreset(_eqPreset.value)
+        }
+    }
+
+    private fun applyEqPreset(preset: EqPreset) {
+        val eq = equalizer ?: return
+        runCatching {
+            val numberOfBands = eq.numberOfBands.toInt()
+            val minLevel = eq.bandLevelRange[0].toInt()
+            val maxLevel = eq.bandLevelRange[1].toInt()
+            val boost = ((maxLevel - minLevel) * 0.32f).toInt()
+            val bassLimit = 250_000
+            val trebleStart = 4_000_000
+
+            for (band in 0 until numberOfBands) {
+                val centerFreq = eq.getCenterFreq(band.toShort())
+                val level = when (preset) {
+                    EqPreset.FLAT -> 0
+                    EqPreset.BASS_BOOST -> when {
+                        centerFreq <= bassLimit -> boost
+                        centerFreq >= trebleStart -> -boost / 2
+                        else -> 0
+                    }
+                    EqPreset.VOCAL -> when {
+                        centerFreq in 800_000..3_000_000 -> boost
+                        centerFreq <= bassLimit -> -boost / 3
+                        else -> 0
+                    }
+                    EqPreset.TREBLE_BOOST -> when {
+                        centerFreq >= trebleStart -> boost
+                        centerFreq <= bassLimit -> -boost / 2
+                        else -> 0
+                    }
+                }.coerceIn(minLevel, maxLevel)
+                eq.setBandLevel(band.toShort(), level.toShort())
+            }
+        }
     }
 
     private fun startProgressUpdates() {
@@ -425,7 +517,11 @@ class MusicPlayerController @Inject constructor(
     fun release() {
         commitListenTimeIfNeeded() // flush any pending listen time on release
         audioFadeManager.cancelFade()
+        cancelSleepTimer()
         progressUpdateJob?.cancel()
+        equalizer?.release()
+        equalizer = null
+        equalizerSessionId = -1
         mediaController?.release()
         mediaController = null
     }
