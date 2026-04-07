@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Replay
@@ -56,7 +58,10 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -105,6 +110,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.reproductor.presentation.components.QueueBottomSheet
 import com.example.reproductor.presentation.components.SongOptionsSheet
 import com.example.reproductor.presentation.components.formatDuration
+import com.example.reproductor.presentation.player.MusicPlayerController.EqPreset
 import com.example.reproductor.presentation.screens.player.PlayerViewModel
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +138,8 @@ fun PlayerScreen(
     val playbackProgress by viewModel.playbackProgress.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val shuffleModeEnabled by viewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
+    val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsStateWithLifecycle()
+    val eqPreset by viewModel.eqPreset.collectAsStateWithLifecycle()
 
     // Fix #9: derivedStateOf to avoid full-tree recomposition
     val queue by remember { derivedStateOf { playerState.queue } }
@@ -145,6 +153,7 @@ fun PlayerScreen(
 
     // ── Song options sheet state ────────────────────────────────
     var showSongOptionsSheet by remember { mutableStateOf(false) }
+    var showAudioToolsSheet by remember { mutableStateOf(false) }
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     // ── Seek state ──────────────────────────────────────────────
@@ -261,7 +270,10 @@ fun PlayerScreen(
         Spacer(Modifier.height(12.dp))
 
         // ── Top bar ─────────────────────────────────────────────
-        TopBar(onBackClick = onBackClick)
+        TopBar(
+            onBackClick = onBackClick,
+            onOpenTools = { showAudioToolsSheet = true }
+        )
 
         Spacer(Modifier.height(24.dp))
 
@@ -463,6 +475,21 @@ fun PlayerScreen(
             }
         )
     }
+
+    if (showAudioToolsSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAudioToolsSheet = false },
+            containerColor = Color(0xFF111118)
+        ) {
+            AudioToolsSheet(
+                sleepTimerRemainingMs = sleepTimerRemainingMs,
+                currentPreset = eqPreset,
+                onSleepTimerSelected = { viewModel.startSleepTimer(it) },
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                onEqPresetSelected = { viewModel.setEqPreset(it) }
+            )
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -470,7 +497,10 @@ fun PlayerScreen(
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-private fun TopBar(onBackClick: () -> Unit) {
+private fun TopBar(
+    onBackClick: () -> Unit,
+    onOpenTools: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -490,13 +520,98 @@ private fun TopBar(onBackClick: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = { /* menu */ }) {
+        IconButton(onClick = onOpenTools) {
             Icon(
                 Icons.Default.MoreVert,
-                contentDescription = "Menú",
+                contentDescription = "Opciones de audio",
                 tint = NeutralMuted
             )
         }
+    }
+}
+
+@Composable
+private fun AudioToolsSheet(
+    sleepTimerRemainingMs: Long?,
+    currentPreset: EqPreset,
+    onSleepTimerSelected: (Int) -> Unit,
+    onCancelSleepTimer: () -> Unit,
+    onEqPresetSelected: (EqPreset) -> Unit
+) {
+    val remainingText = sleepTimerRemainingMs?.let {
+        val totalSeconds = it / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        "Activo: %02d:%02d".format(minutes, seconds)
+    } ?: "Sin temporizador"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Timer, contentDescription = null, tint = AccentLime)
+            Spacer(Modifier.width(8.dp))
+            Text("Sleep timer", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(remainingText, color = NeutralMuted, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(10, 20, 30).forEach { min ->
+                AssistChip(
+                    onClick = { onSleepTimerSelected(min) },
+                    label = { Text("${min}m") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = Color(0xFF1E1E2E),
+                        labelColor = Color.White
+                    )
+                )
+            }
+            if (sleepTimerRemainingMs != null) {
+                AssistChip(
+                    onClick = onCancelSleepTimer,
+                    label = { Text("Cancelar") },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = Color(0xFF3A1E28),
+                        labelColor = Color.White
+                    )
+                )
+            }
+        }
+
+        Spacer(Modifier.height(18.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Tune, contentDescription = null, tint = AccentLime)
+            Spacer(Modifier.width(8.dp))
+            Text("Ecualizador básico", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(10.dp))
+
+        val presets = listOf(
+            EqPreset.FLAT to "Flat",
+            EqPreset.BASS_BOOST to "Bass",
+            EqPreset.VOCAL to "Vocal",
+            EqPreset.TREBLE_BOOST to "Treble"
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            presets.forEach { (preset, label) ->
+                val selected = preset == currentPreset
+                AssistChip(
+                    onClick = { onEqPresetSelected(preset) },
+                    label = { Text(label) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = if (selected) AccentLime else Color(0xFF1E1E2E),
+                        labelColor = if (selected) Color.Black else Color.White
+                    )
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -862,4 +977,3 @@ private fun TransportControls(
         }
     }
 }
-
