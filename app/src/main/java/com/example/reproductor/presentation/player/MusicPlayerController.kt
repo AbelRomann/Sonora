@@ -12,9 +12,9 @@ import androidx.media3.session.SessionToken
 import com.example.reproductor.domain.model.PlaybackProgress
 import com.example.reproductor.domain.model.PlayerState
 import com.example.reproductor.domain.model.Song
+import com.example.reproductor.domain.repository.MusicRepository
 import com.example.reproductor.service.MusicPlayerService
 import com.example.reproductor.util.AudioFadeManager
-import com.example.reproductor.domain.repository.MusicRepository
 import com.google.common.util.concurrent.MoreExecutors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +33,8 @@ import javax.inject.Singleton
 @Singleton
 class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val audioFadeManager: AudioFadeManager
 ) {
     private var mediaController: MediaController? = null
     private var equalizer: Equalizer? = null
@@ -41,7 +42,6 @@ class MusicPlayerController @Inject constructor(
     // SupervisorJob prevents one failure from cancelling the entire scope
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressUpdateJob: Job? = null
-    private val audioFadeManager = AudioFadeManager(coroutineScope)
 
     // ── Play-count threshold ──────────────────────────────────────────────────
     private val minListenMs = 30_000L
@@ -452,11 +452,11 @@ class MusicPlayerController @Inject constructor(
     }
 
     fun play() {
-        mediaController?.let { audioFadeManager.fadeInAndPlay(it) }
+        mediaController?.play()
     }
 
     fun pause() {
-        mediaController?.let { audioFadeManager.fadeOutAndPause(it) }
+        mediaController?.pause()
     }
 
     fun seekTo(position: Long) {
