@@ -52,6 +52,7 @@ class MusicPlayerController @Inject constructor(
     private var playCountCounted: Boolean = false
     private var historyCounted: Boolean = false
     private var lastAutoTransitionHandledMs: Long = 0L
+    private var lastKnownPosition: Long = 0L  // para detectar loops silenciosos
 
     // ── State flows ───────────────────────────────────────────────────────────
     private val _playerState = MutableStateFlow(PlayerState())
@@ -124,6 +125,7 @@ class MusicPlayerController @Inject constructor(
                 listenedMs = 0L
                 playCountCounted = false
                 historyCounted = false
+                lastKnownPosition = 0L
                 updatePlayerState()
                 if (mediaController?.isPlaying == true) {
                     recordListenStart()
@@ -135,6 +137,9 @@ class MusicPlayerController @Inject constructor(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
+                // DISCONTINUITY_REASON_AUTO_TRANSITION cubre tanto el paso a la siguiente
+                // canción como el loop de REPEAT_MODE_ONE. En ambos casos reseteamos el
+                // contador para que cada repetición sume su propio play count.
                 if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
                     val now = System.currentTimeMillis()
                     if (now - lastAutoTransitionHandledMs > 500L) {
@@ -146,6 +151,7 @@ class MusicPlayerController @Inject constructor(
                         listenedMs = 0L
                         playCountCounted = false
                         historyCounted = false
+                        lastKnownPosition = 0L
                         if (mediaController?.isPlaying == true) {
                             recordListenStart()
                         }
@@ -316,6 +322,23 @@ class MusicPlayerController @Inject constructor(
                     duration = duration
                 )
             }
+
+            // Detección de loop silencioso: si la posición retrocedió más de 3 segundos
+            // y ya contamos el play, significa que la canción se repitió sin que
+            // onPositionDiscontinuity se disparara (comportamiento variable en Media3).
+            val positionJumpedBack = lastKnownPosition > 3_000L && currentPosition < lastKnownPosition - 3_000L
+            if (positionJumpedBack && (playCountCounted || historyCounted)) {
+                val now = System.currentTimeMillis()
+                if (now - lastAutoTransitionHandledMs > 500L) {
+                    lastAutoTransitionHandledMs = now
+                    commitListenTimeIfNeeded()
+                    listenedMs = 0L
+                    playCountCounted = false
+                    historyCounted = false
+                    if (controller.isPlaying) recordListenStart()
+                }
+            }
+            lastKnownPosition = currentPosition
         }
         if (playCountCounted && historyCounted) return
         val currentListenStart = listenStartMs ?: return
